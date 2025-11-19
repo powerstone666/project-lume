@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+body {
+  background-color: black;
+  overflow-x: hidden;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.banner-swiper .swiper-pagination-bullet {
+  background-color: rgba(145, 70, 255, 0.4);
+  opacity: 1;
+}
+
+.banner-swiper .swiper-pagination-bullet-active {
+  background-color: #9146ff;
+  opacity: 1;
+}
+
+.banner-swiper .swiper-button-prev,
+.banner-swiper .swiper-button-next {
+  color: #9146ff;
+}
+
+@media (max-width: 768px) {
+  .banner-swiper .swiper-button-prev,
+  .banner-swiper .swiper-button-next {
+    display: none;
+  }
+}
+
+.cards-row-swiper .swiper-button-prev,
+.cards-row-swiper .swiper-button-next {
+  color: #9146ff;
+}
+
+.cards-row-swiper .swiper-button-prev::after,
+.cards-row-swiper .swiper-button-next::after {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.cards-row-swiper .swiper-button-prev.swiper-button-disabled,
+.cards-row-swiper .swiper-button-next.swiper-button-disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .cards-row-swiper .swiper-button-prev,
+  .cards-row-swiper .swiper-button-next {
+    display: none;
+  }
+}
+
+/* Global scrollbar styling with Twitch color, hidden when idle */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+body:hover::-webkit-scrollbar-track {
+  background: #050508;
+}
+
+body:hover::-webkit-scrollbar-thumb {
+  background-color: #9146ff;
+}
+
+body:hover::-webkit-scrollbar-thumb:hover {
+  background-color: #772ce8;
+}
