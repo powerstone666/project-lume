@@ -9,8 +9,6 @@ import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemIcon from "@mui/material/ListItemIcon";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import HomeIcon from "@mui/icons-material/Home";
 import TvIcon from "@mui/icons-material/Tv";
@@ -33,15 +31,46 @@ function Navbar() {
       const params = new URLSearchParams(location.search);
       const q = params.get("q") || "";
       setSearchText(q);
+    } else {
+      // Clear search box when navigating away from search page
+      setSearchText("");
     }
   }, [location.pathname, location.search]);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
   const [deferredPrompt, setDeferredPrompt] = React.useState(null);
   const [showInstallButton, setShowInstallButton] = React.useState(false);
+  const [isStandalone, setIsStandalone] = React.useState(false);
+  const [swControlled, setSwControlled] = React.useState(false);
 
   const toggleMenu = (open) => () => setMobileMenuOpen(open);
   const toggleSearch = (open) => () => setMobileSearchOpen(open);
+
+  // Track whether the app is already installed to decide if the install CTA should render.
+  React.useEffect(() => {
+    const displayMedia = window.matchMedia("(display-mode: standalone)");
+    const checkStandalone = () => {
+      setIsStandalone(displayMedia.matches || window.navigator.standalone === true);
+      console.log('PWA standalone display mode:', displayMedia.matches || window.navigator.standalone === true);
+    };
+
+    checkStandalone();
+    displayMedia.addEventListener("change", checkStandalone);
+    return () => displayMedia.removeEventListener("change", checkStandalone);
+  }, []);
+
+  // Track service worker control status.
+  React.useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    const updateControl = () => {
+      const controller = navigator.serviceWorker.controller;
+      setSwControlled(Boolean(controller));
+      console.log('Service worker controller:', controller?.scriptURL || null);
+    };
+    updateControl();
+    navigator.serviceWorker.addEventListener('controllerchange', updateControl);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', updateControl);
+  }, []);
 
   // Listen for PWA install prompt
   React.useEffect(() => {
@@ -50,6 +79,7 @@ function Navbar() {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallButton(true);
+      console.log('beforeinstallprompt captured; install button enabled');
     };
 
     const handleAppInstalled = () => {
@@ -67,8 +97,23 @@ function Navbar() {
     };
   }, []);
 
+  React.useEffect(() => {
+    console.log('PWA install button visible:', showInstallButton, '| deferredPrompt available:', Boolean(deferredPrompt));
+  }, [showInstallButton, deferredPrompt]);
+
+  React.useEffect(() => {
+    // If we have SW control and are not installed, make the CTA visible even if the prompt hasn't fired yet.
+    if (!isStandalone && swControlled) {
+      setShowInstallButton(true);
+      console.log('Install button forced visible because SW controls the page.');
+    }
+  }, [isStandalone, swControlled]);
+
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      console.warn('Install prompt not available. If incognito or prompt suppressed, use a normal window or the browser menu to install.');
+      return;
+    }
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
@@ -195,12 +240,20 @@ function Navbar() {
           </div>
 
           {/* PWA Install Button */}
-          {showInstallButton && (
+          {!isStandalone && showInstallButton && deferredPrompt && (
             <IconButton
               onClick={handleInstallClick}
               size="medium"
               aria-label="Install app"
-              sx={{ color: '#9146ff', '&:hover': { color: '#b097ff' }, p: 0.5 }}
+              sx={{
+                color: '#9146ff', // Twitch-like purple
+                border: '1px solid #9146ff55',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                '&:hover': { color: '#b097ff', borderColor: '#9146ff' },
+                p: 0.5
+              }}
+              title={deferredPrompt ? 'Install AnyWatch' : 'Install from your browser menu'}
             >
               <GetAppIcon fontSize="medium" />
             </IconButton>
