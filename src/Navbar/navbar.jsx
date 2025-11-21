@@ -25,6 +25,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchText, setSearchText] = React.useState("");
+  const [isPrompting, setIsPrompting] = React.useState(false);
 
   React.useEffect(() => {
     if (location.pathname.startsWith("/search")) {
@@ -51,7 +52,6 @@ function Navbar() {
     const displayMedia = window.matchMedia("(display-mode: standalone)");
     const checkStandalone = () => {
       setIsStandalone(displayMedia.matches || window.navigator.standalone === true);
-      console.log('PWA standalone display mode:', displayMedia.matches || window.navigator.standalone === true);
     };
 
     checkStandalone();
@@ -65,7 +65,6 @@ function Navbar() {
     const updateControl = () => {
       const controller = navigator.serviceWorker.controller;
       setSwControlled(Boolean(controller));
-      console.log('Service worker controller:', controller?.scriptURL || null);
     };
     updateControl();
     navigator.serviceWorker.addEventListener('controllerchange', updateControl);
@@ -74,16 +73,27 @@ function Navbar() {
 
   // Listen for PWA install prompt
   React.useEffect(() => {
+    const promptAppInstall = async (event) => {
+      setIsPrompting(true);
+      event.prompt();
+      const { outcome } = await event.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallButton(false);
+      }
+      setDeferredPrompt(null);
+      setIsPrompting(false);
+    };
+
     const handleBeforeInstallPrompt = (e) => {
-      console.log('👋 PWA Install Prompt fired!');
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallButton(true);
-      console.log('beforeinstallprompt captured; install button enabled');
+      promptAppInstall(e).catch(() => {
+        setIsPrompting(false);
+      });
     };
 
     const handleAppInstalled = () => {
-      console.log('✅ App installed successfully');
       setShowInstallButton(false);
       setDeferredPrompt(null);
     };
@@ -98,31 +108,26 @@ function Navbar() {
   }, []);
 
   React.useEffect(() => {
-    console.log('PWA install button visible:', showInstallButton, '| deferredPrompt available:', Boolean(deferredPrompt));
-  }, [showInstallButton, deferredPrompt]);
-
-  React.useEffect(() => {
     // If we have SW control and are not installed, make the CTA visible even if the prompt hasn't fired yet.
     if (!isStandalone && swControlled) {
       setShowInstallButton(true);
-      console.log('Install button forced visible because SW controls the page.');
     }
   }, [isStandalone, swControlled]);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      console.warn('Install prompt not available. If incognito or prompt suppressed, use a normal window or the browser menu to install.');
-      return;
-    }
+    if (!deferredPrompt || isPrompting) return;
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      setShowInstallButton(false);
+    setIsPrompting(true);
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallButton(false);
+      }
+    } finally {
+      setDeferredPrompt(null);
+      setIsPrompting(false);
     }
-    
-    setDeferredPrompt(null);
   };
 
   const isActivePath = (path) => {

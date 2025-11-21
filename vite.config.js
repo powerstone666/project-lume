@@ -4,6 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    // Ensure React is only bundled once. Duplicate React copies can break hooks in
+    // third-party libs (MUI) and trigger errors like "Cannot read properties of undefined (reading 'useLayoutEffect')".
+    dedupe: ['react', 'react-dom'],
+  },
   plugins: [
     react({
       babel: {
