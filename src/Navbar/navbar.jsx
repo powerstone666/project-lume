@@ -114,24 +114,10 @@ function Navbar() {
 
   // Listen for PWA install prompt
   React.useEffect(() => {
-    const promptAppInstall = async (event) => {
-      setIsPrompting(true);
-      event.prompt();
-      const { outcome } = await event.userChoice;
-      if (outcome === 'accepted') {
-        setShowInstallButton(false);
-      }
-      setDeferredPrompt(null);
-      setIsPrompting(false);
-    };
-
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallButton(true);
-      promptAppInstall(e).catch(() => {
-        setIsPrompting(false);
-      });
     };
 
     const handleAppInstalled = () => {
@@ -239,7 +225,7 @@ function Navbar() {
               type="button"
               aria-label="open search"
               onClick={toggleSearch(true)}
-              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all"
+              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
             >
               <SearchIcon />
             </button>
@@ -247,7 +233,7 @@ function Navbar() {
               type="button"
               aria-label="open menu"
               onClick={toggleMenu(true)}
-              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all"
+              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
             >
               <MenuIcon />
             </button>
@@ -291,7 +277,7 @@ function Navbar() {
               type="button"
               onClick={handleInstallClick}
               aria-label="Install app"
-              className="p-2 rounded-xl text-[#9146ff] border border-[#9146ff]/30 hover:text-[#b097ff] hover:border-[#9146ff] transition-all"
+              className="p-2 rounded-xl text-[#9146ff] border border-[#9146ff]/30 hover:text-[#b097ff] hover:border-[#9146ff] transition-all cursor-pointer"
               title={deferredPrompt ? 'Install AnyWatch' : 'Install from your browser menu'}
             >
               <GetAppIcon />
@@ -301,7 +287,7 @@ function Navbar() {
           <button
             type="button"
             aria-label="cast"
-            className="hidden sm:inline-flex p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all"
+            className="hidden sm:inline-flex p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
           >
             <CastIcon />
           </button>
@@ -347,7 +333,7 @@ function MobileCategoryDrawer({ open, onClose }) {
                 navigate(item.path);
                 onClose();
               }}
-              className="flex items-center gap-4 py-4 px-4 rounded-xl hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-[#9146ff]/30 hover:shadow-lg hover:shadow-[#9146ff]/10 text-white"
+              className="flex items-center gap-4 py-4 px-4 rounded-xl hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-[#9146ff]/30 hover:shadow-lg hover:shadow-[#9146ff]/10 text-white cursor-pointer"
             >
               <span className="text-[#9146ff]">{item.icon}</span>
               <span className="font-semibold text-base">{item.text}</span>
@@ -382,7 +368,7 @@ function MobileSearchDialog({ open, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all"
+            className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
             aria-label="back"
           >
             <ArrowBackIcon />
@@ -407,7 +393,7 @@ function MobileSearchDialog({ open, onClose }) {
             <button
               type="button"
               onClick={() => setValue("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 transition-all"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
               style={{ color: value ? '#9146ff' : '#6b7280' }}
               aria-label="clear"
             >
