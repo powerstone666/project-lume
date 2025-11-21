@@ -1,66 +1,18 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-// Simple icon components to replace MUI icons
-const MenuIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
-const ArrowBackIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-  </svg>
-);
-
-const HomeIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const TvIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-  </svg>
-);
-
-const MovieIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-  </svg>
-);
-
-const TrendingUpIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-  </svg>
-);
-
-const CastIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-  </svg>
-);
-
-const GetAppIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
+import { Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, IconButton, Box } from "@mui/material";
+import {
+  Menu as MenuIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+  ArrowBack as ArrowBackIcon,
+  Home as HomeIcon,
+  LiveTv as TvIcon,
+  Movie as MovieIcon,
+  TrendingUp as TrendingUpIcon,
+  Cast as CastIcon,
+  GetApp as GetAppIcon
+} from "@mui/icons-material";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -84,9 +36,43 @@ function Navbar() {
   const [showInstallButton, setShowInstallButton] = React.useState(false);
   const [isStandalone, setIsStandalone] = React.useState(false);
   const [swControlled, setSwControlled] = React.useState(false);
+  const previousOverflow = React.useRef("");
 
-  const toggleMenu = (open) => () => setMobileMenuOpen(open);
-  const toggleSearch = (open) => () => setMobileSearchOpen(open);
+  const toggleMenu = (open) => () => {
+    if (open) setMobileSearchOpen(false);
+    setMobileMenuOpen(open);
+  };
+  const toggleSearch = (open) => () => {
+    if (open) setMobileMenuOpen(false);
+    setMobileSearchOpen(open);
+  };
+
+  // Keep background from scrolling when mobile layers are open and allow escape key to close them.
+  React.useEffect(() => {
+    const shouldLock = mobileSearchOpen; // Drawer handles its own locking
+
+    if (shouldLock) {
+      previousOverflow.current = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = previousOverflow.current || "";
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileSearchOpen(false);
+      }
+    };
+
+    if (shouldLock) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow.current || "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileSearchOpen]);
 
   // Track whether the app is already installed to decide if the install CTA should render.
   React.useEffect(() => {
@@ -170,6 +156,13 @@ function Navbar() {
         ? "text-white border-b-2 border-[#9146ff]"
         : "text-gray-300 hover:text-white"
     }`;
+
+  const drawerItems = [
+    { text: "Home", icon: <HomeIcon />, path: "/" },
+    { text: "Shows", icon: <TvIcon />, path: "/shows" },
+    { text: "Movies", icon: <MovieIcon />, path: "/movies" },
+    { text: "New & popular", icon: <TrendingUpIcon />, path: "/new" },
+  ];
 
   return (
     <nav className="sticky top-0 z-30 bg-black/75 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50">
@@ -294,54 +287,75 @@ function Navbar() {
         </div>
 
         {/* Mobile widgets: Drawer + Dialog */}
-        <MobileCategoryDrawer open={mobileMenuOpen} onClose={toggleMenu(false)} />
+        <Drawer
+          anchor="left"
+          open={mobileMenuOpen}
+          onClose={toggleMenu(false)}
+          PaperProps={{
+            sx: {
+              width: "82vw",
+              maxWidth: "320px",
+              background: "linear-gradient(to bottom right, #000000, #09090b, #000000)",
+              borderRight: "1px solid rgba(255, 255, 255, 0.1)",
+              color: "white",
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, pt: 3, pb: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div className="text-lg font-black tracking-tight text-white">
+                AnyWatch
+              </div>
+              <IconButton
+                onClick={toggleMenu(false)}
+                sx={{ color: '#9146ff', '&:hover': { color: '#b097ff', bgcolor: 'rgba(255, 255, 255, 0.1)' } }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <List sx={{ flex: 1, px: 1.5, py: 2 }}>
+              {drawerItems.map((item) => {
+                const active = isActivePath(item.path);
+                return (
+                  <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+                    <ListItemButton
+                      onClick={() => {
+                        navigate(item.path);
+                        toggleMenu(false)();
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: active ? 'rgba(145, 70, 255, 0.6)' : 'transparent',
+                        bgcolor: active ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                        boxShadow: active ? '0 4px 6px -1px rgba(145, 70, 255, 0.2)' : 'none',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          borderColor: 'rgba(145, 70, 255, 0.3)',
+                        },
+                      }}
+                    >
+                      <ListItemIcon sx={{ color: '#9146ff', minWidth: 40 }}>
+                        {item.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.text}
+                        primaryTypographyProps={{
+                          fontWeight: 600,
+                          fontSize: '1rem',
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
+            </List>
+          </Box>
+        </Drawer>
         <MobileSearchDialog open={mobileSearchOpen} onClose={toggleSearch(false)} />
       </div>
     </nav>
-  );
-}
-
-// Drawer for mobile categories
-function MobileCategoryDrawer({ open, onClose }) {
-  const navigate = useNavigate();
-
-  const items = [
-    { text: "Home", icon: <HomeIcon />, path: "/" },
-    { text: "Shows", icon: <TvIcon />, path: "/shows" },
-    { text: "Movies", icon: <MovieIcon />, path: "/movies" },
-    { text: "New & popular", icon: <TrendingUpIcon />, path: "/new" },
-  ];
-
-  if (!open) return null;
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-300"
-        onClick={onClose}
-      />
-      
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-br from-black via-zinc-950 to-black border-l border-white/10 z-50 animate-in slide-in-from-right duration-300">
-        <div className="h-full flex flex-col justify-center px-3 space-y-3">
-          {items.map((item) => (
-            <button
-              key={item.text}
-              type="button"
-              onClick={() => {
-                navigate(item.path);
-                onClose();
-              }}
-              className="flex items-center gap-4 py-4 px-4 rounded-xl hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-[#9146ff]/30 hover:shadow-lg hover:shadow-[#9146ff]/10 text-white cursor-pointer"
-            >
-              <span className="text-[#9146ff]">{item.icon}</span>
-              <span className="font-semibold text-base">{item.text}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
   );
 }
 
