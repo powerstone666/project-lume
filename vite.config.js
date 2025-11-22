@@ -32,10 +32,10 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3000000, // Increase limit to 3MB to avoid warnings for large assets
       },
       manifest: {
-        name: 'AnyWatch',
-        short_name: 'AnyWatch',
-        description: 'Stream and discover movies and series.',
-        theme_color: '#000000',
+        name: 'Lume',
+        short_name: 'Lume',
+        description: 'Premium streaming experience',
+        theme_color: '#9146FF',
         background_color: '#000000',
         display: 'standalone',
         orientation: 'portrait',

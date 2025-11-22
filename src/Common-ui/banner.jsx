@@ -183,17 +183,17 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
                   <p className="hidden md:block max-w-xl lg:max-w-2xl text-base lg:text-lg text-gray-100 leading-relaxed drop-shadow-lg line-clamp-3">
                     {item.overview}
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-4">
+                  <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-4 overflow-x-auto no-scrollbar">
                     {score && (
-                      <span className="inline-flex items-center px-4 py-2 rounded-full bg-black/70 backdrop-blur-sm text-base font-bold border border-white/10 shadow-xl">
-                        <span className="mr-2 text-yellow-400 text-lg">★</span>
+                      <span className="inline-flex items-center px-2 py-1 md:px-4 md:py-2 rounded-full bg-black/70 backdrop-blur-sm text-xs md:text-base font-bold border border-white/10 shadow-xl shrink-0">
+                        <span className="mr-1 md:mr-2 text-yellow-400 text-sm md:text-lg">★</span>
                         <span className="text-white">{score}</span>
                       </span>
                     )}
                     {/* Enhanced Play button */}
                     <button
                       type="button"
-                      className="group inline-flex items-center px-6 py-2.5 md:px-8 md:py-3.5 rounded-full text-base md:text-lg font-bold bg-[#9146FF] hover:bg-[#772ce8] transition-all duration-300 shadow-2xl shadow-purple-900/50 cursor-pointer hover:scale-105 hover:shadow-purple-500/50"
+                      className="group inline-flex items-center px-3 py-1.5 md:px-8 md:py-3.5 rounded-full text-xs md:text-lg font-bold bg-[#9146FF] hover:bg-[#772ce8] transition-all duration-300 shadow-2xl shadow-purple-900/50 cursor-pointer hover:scale-105 hover:shadow-purple-500/50 shrink-0"
                       onClick={() => {
                         // Check for Anime: Animation genre (16) + Japanese language ('ja')
                         const isAnime = 
@@ -204,13 +204,13 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
                         navigate(`/stream/${type}/${item.id}`);
                       }}
                     >
-                      <span className="mr-3 text-2xl transition-transform group-hover:scale-110">▶</span>
+                      <span className="mr-1.5 md:mr-3 text-base md:text-2xl transition-transform group-hover:scale-110">▶</span>
                       Play Now
                     </button>
                     {/* Enhanced More Info button */}
                     <button
                       type="button"
-                      className="group inline-flex items-center px-6 py-2.5 md:px-8 md:py-3.5 rounded-full text-base md:text-lg font-bold bg-black/50 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 border-2 border-white/40 hover:border-white/60 cursor-pointer hover:scale-105 shadow-xl"
+                      className="group inline-flex items-center px-3 py-1.5 md:px-8 md:py-3.5 rounded-full text-xs md:text-lg font-bold bg-black/50 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 border-2 border-white/40 hover:border-white/60 cursor-pointer hover:scale-105 shadow-xl shrink-0"
                       onClick={() => {
                         // Check for Anime: Animation genre (16) + Japanese language ('ja')
                         const isAnime = 
@@ -221,7 +221,7 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
                         navigate(`/stream/${type}/${item.id}`);
                       }}
                     >
-                      <span className="mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/30 text-sm font-black transition-all group-hover:bg-white/50">
+                      <span className="mr-1.5 md:mr-3 inline-flex h-4 w-4 md:h-6 md:w-6 items-center justify-center rounded-full bg-white/30 text-[10px] md:text-sm font-black transition-all group-hover:bg-white/50">
                         i
                       </span>
                       More Info

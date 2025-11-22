@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import Home from './Home/home';
 import Navbar from './Navbar/navbar';
+import Footer from './Footer/footer';
 import Stream from './Stream/stream';
 import Search from './Search/search';
 import Shows from './Shows/shows';
@@ -27,6 +28,7 @@ function App() {
         <Route path="/stream/:mediaType/:id" element={<Stream />} />
         <Route path="/search" element={<Search />} />
       </Routes>
+      <Footer />
     </>
   );
 }

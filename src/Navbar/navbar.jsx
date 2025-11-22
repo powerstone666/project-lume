@@ -172,15 +172,14 @@ function Navbar() {
   return (
     <nav className="sticky top-0 z-30 bg-black/75 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
-        {/* Logo - left */}
-        <div
-          className="flex items-center gap-2 cursor-pointer group"
-          onClick={() => navigate("/")}
-        >
-          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-[#9146ff] via-[#b097ff] to-[#9146ff] bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(145,70,255,0.5)] transition-all group-hover:drop-shadow-[0_0_15px_rgba(145,70,255,0.8)]">
-            Any<span className="ml-0.5 text-transparent">Watch</span>
-          </h1>
-        </div>
+          <div
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => navigate("/")}
+          >
+            <h1 className="text-3xl font-black tracking-wide bg-gradient-to-r from-purple-400 via-[#9146FF] to-purple-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(145,70,255,0.5)] transition-all duration-500 group-hover:drop-shadow-[0_0_30px_rgba(145,70,255,0.7)] group-hover:tracking-wider">
+              Lume
+            </h1>
+          </div>
 
         {/* Center nav links - Netflix-style */}
         <div className="hidden items-center gap-3 text-sm font-semibold md:flex">
@@ -276,7 +275,7 @@ function Navbar() {
               onClick={handleInstallClick}
               aria-label="Install app"
               className="p-2 rounded-xl text-[#9146ff] border border-[#9146ff]/30 hover:text-[#b097ff] hover:border-[#9146ff] transition-all cursor-pointer"
-              title={deferredPrompt ? 'Install AnyWatch' : 'Install from your browser menu'}
+              title={deferredPrompt ? 'Install Lume' : 'Install from your browser menu'}
             >
               <GetAppIcon />
             </button>
@@ -309,7 +308,7 @@ function Navbar() {
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, pt: 3, pb: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <div className="text-lg font-black tracking-tight text-white">
-                AnyWatch
+                Lume
               </div>
               <IconButton
                 onClick={toggleMenu(false)}
