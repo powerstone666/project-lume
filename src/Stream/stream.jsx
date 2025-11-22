@@ -569,6 +569,7 @@ function Stream() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setInteractionToggle(prev => prev + 1); // Reset timer
                   exitFullscreenAndUnlock();
                   setIsPlaying(false);
                   setIsPlayerLoading(false);
@@ -582,6 +583,7 @@ function Stream() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setInteractionToggle(prev => prev + 1); // Reset timer
                     setShowEpisodeList(!showEpisodeList);
                   }}
                   className="rounded-full bg-black/60 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm hover:bg-black/80 cursor-pointer backdrop-blur-md border border-white/10 text-white transition-colors shadow-lg"
@@ -612,8 +614,10 @@ function Stream() {
                       key={ep.id}
                       type="button"
                       onClick={() => {
+                        setInteractionToggle(prev => prev + 1); // Reset timer
                         setSelectedEpisodeNumber(ep.episode_number);
                         setIsPlayerLoading(true);
+                        setShowEpisodeList(false); // Close episode list after selection
                         // Keep playing, just switch source
                       }}
                       className={`w-full text-left p-3 rounded-lg flex gap-3 transition-colors ${
@@ -655,6 +659,7 @@ function Stream() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setInteractionToggle(prev => prev + 1); // Reset timer
                         if (hasNextInSeason) {
                           const nextEp = tvEpisodes[currentEpIndex + 1];
                           setSelectedEpisodeNumber(nextEp.episode_number);
@@ -695,8 +700,18 @@ function Stream() {
                   transform: 'translate3d(0, 0, 0)',
                 }}
               />
+              
+              {/* Transparent overlay to capture taps and show controls - excludes bottom for iframe controls */}
+              <div 
+                className={`absolute inset-x-0 top-0 bottom-28 z-10 transition-opacity duration-200 ${
+                  controlsVisible || showEpisodeList ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-0'
+                }`}
+                onClick={handlePlayerClick}
+                onTouchStart={handlePlayerClick}
+              />
+              
               {isPlayerLoading && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black z-20">
                   <div className="flex flex-col items-center gap-3">
                     <div className="h-12 w-12 md:h-16 md:w-16 rounded-full border-4 border-[#9146FF] border-t-transparent animate-spin" />
                     <p className="text-white text-sm md:text-base">Loading player...</p>

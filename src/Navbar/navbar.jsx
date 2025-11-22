@@ -368,8 +368,8 @@ function MobileSearchDialog({ open, onClose, searchQuery, setSearchQuery }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-x-0 top-16 z-20 bg-black/95 backdrop-blur-xl border-b border-white/10 shadow-2xl animate-in slide-in-from-top duration-300">
-      <div className="p-4 max-w-7xl mx-auto">
+    <div className="fixed inset-x-0 top-16 z-20 bg-black/95 backdrop-blur-xl border-b border-white/10 shadow-2xl animate-in slide-in-from-top duration-300 pointer-events-none">
+      <div className="p-4 max-w-7xl mx-auto pointer-events-auto">
         <div className="flex items-center gap-3">
           <button
             type="button"
