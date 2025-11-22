@@ -8,6 +8,7 @@ import Search from './Search/search';
 import Shows from './Shows/shows';
 import Movies from './Movies/movies';
 import NewPopular from './NewPopular/newPopular';
+import { Analytics } from "@vercel/analytics/next"
 
 function App() {
   const location = useLocation();
@@ -19,6 +20,7 @@ function App() {
 
   return (
     <>
+      <Analytics />
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
