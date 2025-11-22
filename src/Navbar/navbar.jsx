@@ -20,22 +20,15 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import CastIcon from "@mui/icons-material/Cast";
 import GetAppIcon from "@mui/icons-material/GetApp";
 
-function Navbar() {
+function Navbar({ searchQuery, setSearchQuery }) {
   const navigate = usePrivateNavigate();
   const location = useLocation();
-  const [searchText, setSearchText] = React.useState("");
+  // Remove searchText state - use props instead
   const [isPrompting, setIsPrompting] = React.useState(false);
 
-  React.useEffect(() => {
-    if (location.pathname.startsWith("/search")) {
-      const params = new URLSearchParams(location.search);
-      const q = params.get("q") || "";
-      setSearchText(q);
-    } else {
-      // Clear search box when navigating away from search page
-      setSearchText("");
-    }
-  }, [location.pathname, location.search]);
+  // Remove URL sync - search is now prop-driven
+  // useEffect(() => {...}, [location.pathname, location.search]);
+  
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
   const [deferredPrompt, setDeferredPrompt] = React.useState(null);
@@ -246,25 +239,16 @@ function Navbar() {
               type="text"
               placeholder="Search movies, shows..."
               className="w-full max-w-md rounded-full border border-white/20 bg-white/5 backdrop-blur-sm px-4 py-2.5 pl-10 text-sm text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/40 focus:bg-white/10 transition-all cursor-text shadow-lg"
-              value={searchText}
+              value={searchQuery}
               onFocus={() => {
-                const params = new URLSearchParams(location.search);
-                if (!params.get("q") && searchText.trim()) {
-                  params.set("q", searchText.trim());
+                // Navigate to search page (no URL params needed)
+                if (!location.pathname.startsWith('/search')) {
+                  navigate('/search');
                 }
-                const queryString = params.toString();
-                navigate(`/search${queryString ? `?${queryString}` : ""}`);
               }}
               onChange={(e) => {
-                const value = e.target.value;
-                setSearchText(value);
-                const params = new URLSearchParams(location.search);
-                if (value.trim()) {
-                  params.set("q", value);
-                } else {
-                  params.delete("q");
-                }
-                navigate(`/search?${params.toString()}`);
+                // Update shared state (no URL, no history spam!)
+                setSearchQuery(e.target.value);
               }}
             />
           </div>
@@ -358,25 +342,28 @@ function Navbar() {
             </List>
           </Box>
         </Drawer>
-        <MobileSearchDialog open={mobileSearchOpen} onClose={toggleSearch(false)} />
+        <MobileSearchDialog 
+          open={mobileSearchOpen} 
+          onClose={toggleSearch(false)} 
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+        />
       </div>
     </nav>
   );
 }
 
 // Dialog for mobile search
-function MobileSearchDialog({ open, onClose }) {
+function MobileSearchDialog({ open, onClose, searchQuery, setSearchQuery }) {
   const navigate = usePrivateNavigate();
   const location = useLocation();
-  const [value, setValue] = React.useState("");
 
+  // Navigate to search page when mobile search opens
   React.useEffect(() => {
-    if (location.pathname.startsWith("/search")) {
-      const params = new URLSearchParams(location.search);
-      const q = params.get("q") || "";
-      setValue(q);
+    if (open && !location.pathname.startsWith("/search")) {
+      navigate("/search");
     }
-  }, [location.pathname, location.search]);
+  }, [open, location.pathname, navigate]);
 
   if (!open) return null;
 
@@ -397,23 +384,18 @@ function MobileSearchDialog({ open, onClose }) {
               type="text"
               autoFocus
               placeholder="Search movies, shows..."
-              value={value}
+              value={searchQuery}
               onChange={(e) => {
-                const next = e.target.value;
-                setValue(next);
-                const params = new URLSearchParams();
-                if (next.trim()) {
-                  params.set("q", next);
-                }
-                navigate(`/search?${params.toString()}`);
+                // Update shared state (no URL!)
+                setSearchQuery(e.target.value);
               }}
               className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2.5 pr-12 text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/30 transition-all"
             />
             <button
               type="button"
-              onClick={() => setValue("")}
+              onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
-              style={{ color: value ? '#9146ff' : '#6b7280' }}
+              style={{ color: searchQuery ? '#9146ff' : '#6b7280' }}
               aria-label="clear"
             >
               <CloseIcon />

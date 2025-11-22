@@ -1,27 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
 import { searchMulti } from '../Api-services/tmbd';
 
-function Search() {
+function Search({ searchQuery }) {
   const navigate = usePrivateNavigate();
-  const [searchParams] = useSearchParams();
-  const urlQuery = (searchParams.get('q') || '').trim();
-
-  const [debouncedQuery, setDebouncedQuery] = useState(urlQuery);
+  
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Debounce searchQuery prop changes
   useEffect(() => {
-    // When URL query changes, start / update debounce timer
-    const next = urlQuery;
     const timer = setTimeout(() => {
-      setDebouncedQuery(next);
+      setDebouncedQuery(searchQuery.trim());
     }, 400);
     return () => clearTimeout(timer);
-  }, [urlQuery]);
+  }, [searchQuery]);
 
+  // Perform search when debounced query changes
   useEffect(() => {
     if (!debouncedQuery) {
       setResults([]);
@@ -33,7 +30,7 @@ function Search() {
     const controller = new AbortController();
     let active = true;
 
-    const timer = setTimeout(async () => {
+    const performSearch = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -54,11 +51,12 @@ function Search() {
           setLoading(false);
         }
       }
-    }, 400);
+    };
+
+    performSearch();
 
     return () => {
       active = false;
-      clearTimeout(timer);
       controller.abort();
     };
   }, [debouncedQuery]);
