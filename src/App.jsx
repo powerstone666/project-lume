@@ -8,7 +8,7 @@ import Search from './Search/search';
 import Shows from './Shows/shows';
 import Movies from './Movies/movies';
 import NewPopular from './NewPopular/newPopular';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   const location = useLocation();
