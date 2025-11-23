@@ -5,8 +5,52 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
 import { fetchDiscoverMedia, fetchTrendingTodayMedia } from '../Api-services/tmbd';
-const year=new Date().getFullYear();
+
+const year = new Date().getFullYear();
 export const ROWS = [
+  // Netflix
+  {
+    id: 'new-netflix',
+    title: 'Newly Added on Netflix',
+    mediaTypes: ['movie', 'tv'],
+    source: 'tmdb',
+    paramsByType: {
+      movie: {
+        sort_by: 'primary_release_date.desc',
+        watch_region: 'IN',
+        with_watch_providers: 8,
+        'vote_count.gte': 10,
+      },
+      tv: {
+        sort_by: 'first_air_date.desc',
+        watch_region: 'IN',
+        with_watch_providers: 8,
+        'vote_count.gte': 10,
+      },
+    },
+  },
+  // Prime Video
+  {
+    id: 'new-prime',
+    title: 'Newly Added on Prime Video',
+    mediaTypes: ['movie', 'tv'],
+    source: 'tmdb',
+    paramsByType: {
+      movie: {
+        sort_by: 'primary_release_date.desc',
+        watch_region: 'IN',
+        with_watch_providers: 119,
+        'vote_count.gte': 10,
+      },
+      tv: {
+        sort_by: 'first_air_date.desc',
+        watch_region: 'IN',
+        with_watch_providers: 119,
+        'vote_count.gte': 10,
+      },
+    },
+  },
+  // Existing rows (trending, etc.)
   {
     id: 'trending-today-movies',
     title: 'Trending Today – Movies',
@@ -25,11 +69,12 @@ export const ROWS = [
     mediaType: 'movie',
     source: 'tmdb',
     params: {
-        sort_by: 'popularity.desc',
+      sort_by: 'popularity.desc',
       with_origin_country: 'IN',
-      'primary_release_date.gte':`${year-1}-01-01`,
+      'primary_release_date.gte': `${year - 1}-01-01`,
     },
   },
+  // Additional rows (keep existing ones after these if needed)
   {
     id: 'new-on-netflix',
     title: 'New on Anymovie',
@@ -319,7 +364,54 @@ function Cards({ rows = ROWS }) {
       const promises = rows.map(async (row) => {
         let items;
 
-        if (row.source === 'trending-today') {
+        if (Array.isArray(row.mediaTypes) && row.source === 'tmdb') {
+          const combined = await Promise.all(
+            row.mediaTypes.map(async (type) => {
+              const params =
+                row.paramsByType?.[type] ||
+                row.params?.[type] ||
+                row.params ||
+                {};
+
+              return fetchDiscoverMedia({
+                cacheKey: `${row.id}-${type}`,
+                mediaType: type,
+                params,
+              });
+            }),
+          );
+
+          items = combined.flat().sort((a, b) => {
+            const dateA = new Date(a.release_date || a.first_air_date || 0);
+            const dateB = new Date(b.release_date || b.first_air_date || 0);
+            return dateB - dateA;
+          });
+
+          if (!items.length) {
+            const fallback = await Promise.all(
+              row.mediaTypes.map(async (type) => {
+                const baseParams =
+                  row.paramsByType?.[type] ||
+                  row.params?.[type] ||
+                  row.params ||
+                  {};
+
+                return fetchDiscoverMedia({
+                  cacheKey: `${row.id}-${type}-fallback`,
+                  mediaType: type,
+                  params: {
+                    sort_by: 'popularity.desc',
+                    'vote_count.gte': 1,
+                    watch_region: baseParams.watch_region || 'IN',
+                    with_watch_providers: baseParams.with_watch_providers,
+                  },
+                });
+              }),
+            );
+
+            items = fallback.flat();
+          }
+        } else if (row.source === 'trending-today') {
           items = await fetchTrendingTodayMedia(row.mediaType);
         } else if (row.source === 'personalized') {
           if (typeof window !== 'undefined') {
@@ -334,6 +426,7 @@ function Cards({ rows = ROWS }) {
             items = [];
           }
         } else {
+          // Default to TMDB discover
           items = await fetchDiscoverMedia({
             cacheKey: row.id,
             mediaType: row.mediaType,
