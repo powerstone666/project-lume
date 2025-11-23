@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
 import { searchMulti } from '../Api-services/tmbd';
 
-function Search({ searchQuery }) {
+function Search() {
   const navigate = usePrivateNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const searchQuery = searchParams.get('q') || '';
   
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState([]);

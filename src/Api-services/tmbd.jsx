@@ -45,6 +45,18 @@ async function fetchJson(url) {
   return data;
 }
 
+function filterUnreleased(results) {
+  if (!Array.isArray(results)) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  return results.filter((item) => {
+    const date = item.release_date || item.first_air_date;
+    // Keep items with no date (assume released/legacy) or date <= today
+    // If you want to be strict and hide items with NO date, remove the `!date ||` part.
+    // Usually, unreleased items have a future date.
+    return !date || date <= today;
+  });
+}
+
 export async function searchMulti(query, { page = 1 } = {}) {
   const trimmed = (query || '').trim();
   if (!trimmed) {
@@ -75,7 +87,12 @@ export async function searchMulti(query, { page = 1 } = {}) {
     lastFetched: Date.now(),
   });
 
-  return results;
+  searchCache.set(key, {
+    data: results,
+    lastFetched: Date.now(),
+  });
+
+  return filterUnreleased(results);
 }
 
 export async function fetchTrendingMoviesInIndia({ forceRefresh = false } = {}) {
@@ -105,7 +122,7 @@ export async function fetchTrendingMoviesInIndia({ forceRefresh = false } = {}) 
     lastFetched: Date.now(),
   };
 
-  return results;
+  return filterUnreleased(results);
 }
 
 export async function fetchTrendingShowsInIndia({ forceRefresh = false } = {}) {
@@ -129,7 +146,7 @@ export async function fetchTrendingShowsInIndia({ forceRefresh = false } = {}) {
     lastFetched: Date.now(),
   };
 
-  return results;
+  return filterUnreleased(results);
 }
 
 export async function fetchDiscoverMedia({
@@ -217,7 +234,7 @@ export async function fetchTrendingTodayMedia(mediaType = 'movie', { forceRefres
     lastFetched: Date.now(),
   };
 
-  return results;
+  return filterUnreleased(results);
 }
 
 export async function fetchMediaDetails(mediaType = 'movie', id) {
@@ -268,7 +285,7 @@ export async function fetchRecommendations(mediaType = 'movie', id) {
     lastFetched: Date.now(),
   });
 
-  return results;
+  return filterUnreleased(results);
 }
 
 export async function fetchSeasonDetails(id, seasonNumber) {
@@ -318,5 +335,5 @@ export async function fetchSimilar(mediaType = 'movie', id) {
     lastFetched: Date.now(),
   });
 
-  return results;
+  return filterUnreleased(results);
 }

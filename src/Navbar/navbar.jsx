@@ -20,14 +20,21 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import CastIcon from "@mui/icons-material/Cast";
 import GetAppIcon from "@mui/icons-material/GetApp";
 
-function Navbar({ searchQuery, setSearchQuery }) {
+function Navbar() {
   const navigate = usePrivateNavigate();
   const location = useLocation();
-  // Remove searchText state - use props instead
+  const [searchText, setSearchText] = React.useState("");
   const [isPrompting, setIsPrompting] = React.useState(false);
 
-  // Remove URL sync - search is now prop-driven
-  // useEffect(() => {...}, [location.pathname, location.search]);
+  React.useEffect(() => {
+    if (location.pathname.startsWith("/search")) {
+      const params = new URLSearchParams(location.search);
+      const q = params.get("q") || "";
+      setSearchText(q);
+    } else {
+      setSearchText("");
+    }
+  }, [location.pathname, location.search]);
   
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
@@ -48,7 +55,7 @@ function Navbar({ searchQuery, setSearchQuery }) {
 
   // Keep background from scrolling when mobile layers are open and allow escape key to close them.
   React.useEffect(() => {
-    const shouldLock = mobileSearchOpen; // Drawer handles its own locking
+    const shouldLock = mobileSearchOpen; 
 
     if (shouldLock) {
       previousOverflow.current = document.body.style.overflow;
@@ -239,16 +246,25 @@ function Navbar({ searchQuery, setSearchQuery }) {
               type="text"
               placeholder="Search movies, shows..."
               className="w-full max-w-md rounded-full border border-white/20 bg-white/5 backdrop-blur-sm px-4 py-2.5 pl-10 text-sm text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/40 focus:bg-white/10 transition-all cursor-text shadow-lg"
-              value={searchQuery}
+              value={searchText}
               onFocus={() => {
-                // Navigate to search page (no URL params needed)
-                if (!location.pathname.startsWith('/search')) {
-                  navigate('/search');
+                const params = new URLSearchParams(location.search);
+                if (!params.get("q") && searchText.trim()) {
+                  params.set("q", searchText.trim());
                 }
+                const queryString = params.toString();
+                navigate(`/search${queryString ? `?${queryString}` : ""}`);
               }}
               onChange={(e) => {
-                // Update shared state (no URL, no history spam!)
-                setSearchQuery(e.target.value);
+                const value = e.target.value;
+                setSearchText(value);
+                const params = new URLSearchParams(location.search);
+                if (value.trim()) {
+                  params.set("q", value);
+                } else {
+                  params.delete("q");
+                }
+                navigate(`/search?${params.toString()}`);
               }}
             />
           </div>
@@ -342,28 +358,32 @@ function Navbar({ searchQuery, setSearchQuery }) {
             </List>
           </Box>
         </Drawer>
-        <MobileSearchDialog 
-          open={mobileSearchOpen} 
-          onClose={toggleSearch(false)} 
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-        />
+        <MobileSearchDialog open={mobileSearchOpen} onClose={toggleSearch(false)} />
       </div>
     </nav>
   );
 }
 
 // Dialog for mobile search
-function MobileSearchDialog({ open, onClose, searchQuery, setSearchQuery }) {
+function MobileSearchDialog({ open, onClose }) {
   const navigate = usePrivateNavigate();
   const location = useLocation();
+  const [value, setValue] = React.useState("");
 
-  // Navigate to search page when mobile search opens
+  const prevPath = React.useRef(location.pathname);
+
   React.useEffect(() => {
-    if (open && !location.pathname.startsWith("/search")) {
-      navigate("/search");
+    if (location.pathname.startsWith("/search")) {
+      const params = new URLSearchParams(location.search);
+      const q = params.get("q") || "";
+      setValue(q);
+    } else if (open && prevPath.current !== location.pathname) {
+      // Only close if we navigated AWAY from a page (path changed)
+      // and the new page is not search.
+      onClose();
     }
-  }, [open, location.pathname, navigate]);
+    prevPath.current = location.pathname;
+  }, [location.pathname, location.search, open, onClose]);
 
   if (!open) return null;
 
@@ -373,7 +393,11 @@ function MobileSearchDialog({ open, onClose, searchQuery, setSearchQuery }) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              setValue("");
+              navigate(location.pathname);
+              onClose();
+            }}
             className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
             aria-label="back"
           >
@@ -384,18 +408,23 @@ function MobileSearchDialog({ open, onClose, searchQuery, setSearchQuery }) {
               type="text"
               autoFocus
               placeholder="Search movies, shows..."
-              value={searchQuery}
+              value={value}
               onChange={(e) => {
-                // Update shared state (no URL!)
-                setSearchQuery(e.target.value);
+                const next = e.target.value;
+                setValue(next);
+                const params = new URLSearchParams();
+                if (next.trim()) {
+                  params.set("q", next);
+                }
+                navigate(`/search?${params.toString()}`);
               }}
               className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2.5 pr-12 text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/30 transition-all"
             />
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
+              onClick={() => setValue("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
-              style={{ color: searchQuery ? '#9146ff' : '#6b7280' }}
+              style={{ color: value ? '#9146ff' : '#6b7280' }}
               aria-label="clear"
             >
               <CloseIcon />

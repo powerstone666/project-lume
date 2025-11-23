@@ -15,9 +15,6 @@ const NewPopular = lazy(() => import('./NewPopular/newPopular'));
 function App() {
   const location = useLocation();
   
-  // Centralized search state (prop drilling to avoid URL spam)
-  const [searchQuery, setSearchQuery] = useState('');
-
   // Scroll to top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -26,7 +23,7 @@ function App() {
   return (
     <>
       <Analytics />
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
       <Suspense fallback={
         <div className="min-h-screen bg-black flex items-center justify-center">
           <div className="text-white text-lg">Loading...</div>
@@ -38,7 +35,7 @@ function App() {
           <Route path="/movies" element={<Movies />} />
           <Route path="/new" element={<NewPopular />} />
           <Route path="/stream/:mediaType/:id" element={<Stream />} />
-          <Route path="/search" element={<Search searchQuery={searchQuery} />} />
+          <Route path="/search" element={<Search />} />
         </Routes>
       </Suspense>
       <Footer />
