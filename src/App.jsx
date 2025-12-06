@@ -22,14 +22,7 @@ function App() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // Request Notification Permission for PWA Updates
-  useEffect(() => {
-      if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission().then(perm => {
-              console.log('Notification permission:', perm);
-          });
-      }
-  }, []);
+
 
   return (
     <>
