@@ -383,11 +383,11 @@ function GlobalPlayer() {
              <div 
                 className={`absolute inset-0 z-[101] pointer-events-none transition-transform duration-300 ${isRotated ? 'rotate-90 origin-center w-[100vh] h-[100vw] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
              >
-                 {/* Interaction Zone (Top 25% relative to rotation) */}
+                 {/* Interaction Zone (Full Screen) - Shows controls on tap, passes through when visible */}
                  <div 
-                    className={`absolute top-0 inset-x-0 h-1/4 pointer-events-auto transition-opacity duration-200 ${controlsVisible ? 'opacity-0' : 'opacity-0 cursor-none'}`}
-                    onMouseMove={showControls}
-                    onClick={showControls}
+                    className={`absolute inset-0 transition-opacity duration-200 ${controlsVisible ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}`}
+                    onMouseMove={() => !controlsVisible && showControls()}
+                    onClick={() => !controlsVisible && showControls()}
                  />
 
                  {/* Top Bar */}
