@@ -243,23 +243,28 @@ function GlobalPlayer() {
   useEffect(() => {
     if (isInlinePlay && !isFullscreenMode) {
         let resizeObserver;
+        let rafId;
+
         const updatePosition = () => {
-            const slot = document.getElementById('video-slot');
-            if (slot) {
-                const rect = slot.getBoundingClientRect();
-                const scrollTop = window.scrollY || document.documentElement.scrollTop;
-                const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
-                
-                // Use absolute positioning relative to document
-                setDockStyle({
-                    position: 'absolute',
-                    top: rect.top + scrollTop,
-                    left: rect.left + scrollLeft,
-                    width: rect.width,
-                    height: rect.height,
-                    zIndex: 50
-                });
-            }
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                const slot = document.getElementById('video-slot');
+                if (slot) {
+                    const rect = slot.getBoundingClientRect();
+                    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+                    const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+                    
+                    // Use absolute positioning relative to document
+                    setDockStyle({
+                        position: 'absolute',
+                        top: rect.top + scrollTop,
+                        left: rect.left + scrollLeft,
+                        width: rect.width,
+                        height: rect.height,
+                        zIndex: 50
+                    });
+                }
+            });
         };
 
         // Initial update
@@ -268,7 +273,17 @@ function GlobalPlayer() {
         // Observer for layout changes (element size/position)
         const slot = document.getElementById('video-slot');
         if (slot) {
-            resizeObserver = new ResizeObserver(updatePosition);
+            resizeObserver = new ResizeObserver((entries) => {
+                // Wrap in RAF to avoid "ResizeObserver loop limit exceeded"
+                 if (rafId) cancelAnimationFrame(rafId);
+                 rafId = requestAnimationFrame(() => {
+                     for (const entry of entries) {
+                         if (entry.target === slot) {
+                             updatePosition();
+                         }
+                     }
+                 });
+            });
             resizeObserver.observe(slot);
         }
         
@@ -276,6 +291,7 @@ function GlobalPlayer() {
         window.addEventListener('resize', updatePosition);
         
         return () => {
+            if (rafId) cancelAnimationFrame(rafId);
             if (resizeObserver) resizeObserver.disconnect();
             window.removeEventListener('resize', updatePosition);
         };
