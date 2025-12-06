@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
 import {
   fetchMediaDetails,
@@ -21,138 +21,14 @@ function Stream() {
   const [seasonEpisodes, setSeasonEpisodes] = useState({});
   const [activeTvTab, setActiveTvTab] = useState('episodes'); // 'episodes' | 'similar'
   const [selectedEpisodeNumber, setSelectedEpisodeNumber] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPlayerLoading, setIsPlayerLoading] = useState(false);
-  const [showNextButton, setShowNextButton] = useState(false);
-  const [showEpisodeList, setShowEpisodeList] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(false);
-  const [interactionToggle, setInteractionToggle] = useState(0);
-  const lastMoveTime = useRef(0);
-
-  // Timer for Next Episode button
-  useEffect(() => {
-    let timer;
-    if (isPlaying) {
-      setShowNextButton(false);
-      timer = setTimeout(() => {
-        setShowNextButton(true);
-      }, 30000); // 30 seconds
-    } else {
-      setShowNextButton(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isPlaying, selectedEpisodeNumber]); // Reset on new episode
-
-
-
-  const handlePlayerClick = () => {
-    setControlsVisible(true);
-    setInteractionToggle(prev => prev + 1); // Reset timer
-  };
-
-  const handleMouseMove = () => {
-    const now = Date.now();
-    // Throttle updates to once every 500ms to avoid excessive re-renders
-    if (now - lastMoveTime.current > 500) {
-      setControlsVisible(true);
-      setInteractionToggle(prev => prev + 1);
-      lastMoveTime.current = now;
-    }
-  };
-
-  const iframeRef = useRef(null);
-
-  // Detect iframe interaction via focus (blur on window)
-  useEffect(() => {
-    const handleBlur = () => {
-      // Small delay to ensure activeElement has updated
-      setTimeout(() => {
-        if (document.activeElement === iframeRef.current) {
-          setControlsVisible(true);
-          setInteractionToggle(prev => prev + 1);
-        }
-      }, 100);
-    };
-
-    window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
-  }, []);
-
-  // Auto-hide controls after 3 seconds and steal focus back
-  useEffect(() => {
-    let timer;
-    if (controlsVisible && !showEpisodeList) {
-      timer = setTimeout(() => {
-        setControlsVisible(false);
-        // Steal focus back to main window so next tap on iframe triggers blur again
-        window.focus();
-        // Also try to blur the active element explicitly if it's the iframe
-        if (document.activeElement === iframeRef.current) {
-          document.activeElement.blur();
-        }
-      }, 3000);
-    }
-    return () => clearTimeout(timer);
-  }, [controlsVisible, showEpisodeList, interactionToggle]);
-  const enterFullscreenAndLockLandscape = async () => {
-    try {
-      const element = document.documentElement;
-      if (element.requestFullscreen) {
-        await element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) {
-        await element.webkitRequestFullscreen();
-      } else if (element.msRequestFullscreen) {
-        await element.msRequestFullscreen();
-      }
-
-      if (screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock('landscape');
-      }
-    } catch (err) {
-      console.warn('Fullscreen or orientation lock failed:', err);
-    }
-  };
-
-  const exitFullscreenAndUnlock = async () => {
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        await document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        await document.msExitFullscreen();
-      }
-
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
-    } catch (err) {
-      console.warn('Exit fullscreen or orientation unlock failed:', err);
-    }
-  };
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isPlaying = searchParams.get('play') === '1';
   // Ensure we start at the top whenever this page mounts
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
   }, []);
-
-  // Lock scroll when video player is open
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (isPlaying) {
-      document.body.classList.add('overflow-hidden');
-    } else {
-      document.body.classList.remove('overflow-hidden');
-    }
-    return () => {
-      document.body.classList.remove('overflow-hidden');
-    };
-  }, [isPlaying]);
-
-  // Ensure orientation unlock when component unmounts
-  useEffect(() => () => exitFullscreenAndUnlock(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,8 +39,7 @@ function Stream() {
         setError(null);
         setSelectedSeason(null);
         setSeasonEpisodes({});
-        setIsPlaying(false); // Reset player state
-        setIsPlayerLoading(false); // Reset player loading state
+        if (cancelled) return;
 
         const data = await fetchMediaDetails(mediaType, id);
         if (cancelled) return;
@@ -362,9 +237,9 @@ function Stream() {
       const firstEpisodeNumber =
         (tvEpisodes[0] && tvEpisodes[0].episode_number) || 1;
       const episodeNumber = selectedEpisodeNumber || firstEpisodeNumber;
-      playerSrc = `${cinemaOsBaseUrl}/${id}/${seasonNum}/${episodeNumber}`;
+      playerSrc = `${cinemaOsBaseUrl}/${id}/${seasonNum}/${episodeNumber}?autoplay=1&sidebar=0&mix=0`;
     } else {
-      playerSrc = `${cinemaOsBaseUrl}/${id}`;
+      playerSrc = `${cinemaOsBaseUrl}/${id}?autoplay=1&sidebar=0&mix=0`;
     }
   }
 
@@ -399,8 +274,8 @@ function Stream() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="relative w-screen h-[50vh] md:h-[60vh] lg:h-[70vh] overflow-hidden left-1/2 -translate-x-1/2">
-        {isPlaying && playerSrc ? (
-          <div className="absolute inset-0 bg-black" />
+        {isPlaying ? (
+          <div id="video-slot" className="absolute inset-0 bg-black z-20" />
         ) : trailerKey ? (
           <div className="absolute inset-0 overflow-hidden">
             <iframe
@@ -465,9 +340,7 @@ function Stream() {
                 type="button"
                 className="group inline-flex items-center px-5 py-2 sm:px-6 sm:py-2.5 md:px-8 md:py-3.5 rounded-full text-sm sm:text-base md:text-lg font-bold bg-[#9146FF] hover:bg-[#772ce8] transition-all duration-300 shadow-2xl shadow-purple-900/50 cursor-pointer active:scale-95 md:hover:scale-105"
                 onClick={() => {
-                  enterFullscreenAndLockLandscape();
-                  setIsPlayerLoading(true);
-                  setIsPlaying(true);
+                  setSearchParams({ play: '1' });
                 }}
               >
                 <span className="mr-2 md:mr-3 text-xl md:text-2xl transition-transform group-hover:scale-110">▶</span>
@@ -551,177 +424,7 @@ function Stream() {
       )}
 
       {/* Full-screen player overlay - Mobile optimized */}
-      {/* Full-screen player overlay - Mobile optimized */}
-      {isPlaying && playerSrc && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-          <div 
-            className="relative w-full h-full group/player"
-            onClick={handlePlayerClick}
-            onMouseMove={handleMouseMove}
-          >
-            {/* Top controls */}
-            <div 
-              className={`absolute top-4 left-4 z-20 flex items-center gap-3 transition-opacity duration-300 ${
-                controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-               <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setInteractionToggle(prev => prev + 1); // Reset timer
-                  exitFullscreenAndUnlock();
-                  setIsPlaying(false);
-                  setIsPlayerLoading(false);
-                }}
-                className="rounded-full bg-black/60 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm hover:bg-black/80 cursor-pointer backdrop-blur-md border border-white/10 text-white transition-colors shadow-lg"
-              >
-                ✕ Close
-              </button>
-              {(mediaType === 'tv' || mediaType === 'anime') && (
-                 <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setInteractionToggle(prev => prev + 1); // Reset timer
-                    setShowEpisodeList(!showEpisodeList);
-                  }}
-                  className="rounded-full bg-black/60 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm hover:bg-black/80 cursor-pointer backdrop-blur-md border border-white/10 text-white transition-colors shadow-lg"
-                >
-                  ☰ Episodes
-                </button>
-              )}
-            </div>
 
-            {/* Episode List Overlay */}
-            {showEpisodeList && (mediaType === 'tv' || mediaType === 'anime') && (
-              <div 
-                className="absolute top-16 left-4 bottom-4 w-80 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl z-30 flex flex-col overflow-hidden animate-in slide-in-from-left-4 fade-in duration-200"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-zinc-900/50">
-                  <h3 className="font-bold text-white">Episodes</h3>
-                  <button 
-                    onClick={() => setShowEpisodeList(false)}
-                    className="text-gray-400 hover:text-white"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                  {tvEpisodes.map((ep) => (
-                    <button
-                      key={ep.id}
-                      type="button"
-                      onClick={() => {
-                        setInteractionToggle(prev => prev + 1); // Reset timer
-                        setSelectedEpisodeNumber(ep.episode_number);
-                        setIsPlayerLoading(true);
-                        setShowEpisodeList(false); // Close episode list after selection
-                        // Keep playing, just switch source
-                      }}
-                      className={`w-full text-left p-3 rounded-lg flex gap-3 transition-colors ${
-                        selectedEpisodeNumber === ep.episode_number
-                          ? 'bg-[#9146FF] text-white'
-                          : 'hover:bg-white/10 text-gray-300'
-                      }`}
-                    >
-                      <div className="text-sm font-medium truncate flex-1">
-                        {ep.episode_number}. {ep.name}
-                      </div>
-                      {ep.runtime && (
-                        <div className="text-xs opacity-60 whitespace-nowrap self-center">
-                          {ep.runtime}m
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Next Episode Button (Bottom Right) */}
-            {(mediaType === 'tv' || mediaType === 'anime') && (() => {
-              // Calculate next episode logic
-              const currentEpIndex = tvEpisodes.findIndex(e => e.episode_number === selectedEpisodeNumber);
-              const hasNextInSeason = currentEpIndex !== -1 && currentEpIndex < tvEpisodes.length - 1;
-              // We don't easily know if next season exists without fetching, but we can check if current season < total seasons
-              const hasNextSeason = details?.seasons?.some(s => s.season_number === (selectedSeason || 1) + 1);
-
-              if ((hasNextInSeason || hasNextSeason) && showNextButton) {
-                return (
-                  <div 
-                    className={`absolute bottom-20 right-8 z-20 transition-opacity duration-300 ${
-                      controlsVisible ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInteractionToggle(prev => prev + 1); // Reset timer
-                        if (hasNextInSeason) {
-                          const nextEp = tvEpisodes[currentEpIndex + 1];
-                          setSelectedEpisodeNumber(nextEp.episode_number);
-                        } else if (hasNextSeason) {
-                          const nextSeasonNum = (selectedSeason || 1) + 1;
-                          setSelectedSeason(nextSeasonNum);
-                          setSelectedEpisodeNumber(null); // Will default to 1st ep of new season
-                        }
-                        setIsPlayerLoading(true);
-                      }}
-                      className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-black/60 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white text-xs md:text-sm font-medium shadow-lg transition-all"
-                    >
-                      Next Episode <span className="text-base md:text-lg">→</span>
-                    </button>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            <div className="absolute inset-0">
-              <iframe
-                ref={iframeRef}
-                title={title}
-                src={playerSrc}
-                className="w-full h-full border-0"
-                allow="autoplay; picture-in-picture; encrypted-media"
-                sandbox="allow-same-origin allow-scripts allow-forms"
-                referrerPolicy="no-referrer"
-                onLoad={() => setIsPlayerLoading(false)}
-                loading="lazy"
-                importance="high"
-                // Security attributes to block ads, popups, and redirects
-                data-block-popups="true"
-                // Mobile optimization
-                style={{
-                  WebkitOverflowScrolling: 'touch',
-                  transform: 'translate3d(0, 0, 0)',
-                }}
-              />
-              
-              {/* Transparent overlay to capture taps and show controls - excludes bottom for iframe controls */}
-              <div 
-                className={`absolute inset-x-0 top-0 bottom-28 z-10 transition-opacity duration-200 ${
-                  controlsVisible || showEpisodeList ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-0'
-                }`}
-                onClick={handlePlayerClick}
-                onTouchStart={handlePlayerClick}
-              />
-              
-              {isPlayerLoading && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black z-20">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="h-12 w-12 md:h-16 md:w-16 rounded-full border-4 border-[#9146FF] border-t-transparent animate-spin" />
-                    <p className="text-white text-sm md:text-base">Loading player...</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Movie: More like this (poster grid) */}
       {mediaType !== 'tv' && recommended.length > 0 && (
@@ -842,9 +545,7 @@ function Stream() {
                     }`}
                     onClick={() => {
                       setSelectedEpisodeNumber(ep.episode_number);
-                      enterFullscreenAndLockLandscape(); // Ensure orientation lock
-                      setIsPlayerLoading(true);
-                      setIsPlaying(true);
+                      setSearchParams({ play: '1' });
                     }}
                   >
                     {still && (

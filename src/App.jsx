@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, lazy, Suspense, useState } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import Navbar from './Navbar/navbar';
 import Footer from './Footer/footer';
 import { Analytics } from "@vercel/analytics/react"
@@ -11,6 +11,7 @@ const Search = lazy(() => import('./Search/search'));
 const Shows = lazy(() => import('./Shows/shows'));
 const Movies = lazy(() => import('./Movies/movies'));
 const NewPopular = lazy(() => import('./NewPopular/newPopular'));
+import GlobalPlayer from './Stream/GlobalPlayer';
 
 function App() {
   const location = useLocation();
@@ -35,10 +36,12 @@ function App() {
           <Route path="/movies" element={<Movies />} />
           <Route path="/new" element={<NewPopular />} />
           <Route path="/stream/:mediaType/:id" element={<Stream />} />
+          <Route path="/watch/:mediaType/:id" element={null} /> {/* Handled by GlobalPlayer */}
           <Route path="/search" element={<Search />} />
         </Routes>
       </Suspense>
       <Footer />
+      <GlobalPlayer />
     </>
   );
 }

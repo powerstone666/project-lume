@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+html,
 body {
   background-color: black;
   overflow-x: hidden;
+  min-height: 100%;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

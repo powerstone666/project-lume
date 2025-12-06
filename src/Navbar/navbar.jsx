@@ -42,7 +42,7 @@ function Navbar() {
   const [showInstallButton, setShowInstallButton] = React.useState(false);
   const [isStandalone, setIsStandalone] = React.useState(false);
   const [swControlled, setSwControlled] = React.useState(false);
-  const previousOverflow = React.useRef("");
+
 
   const toggleMenu = (open) => () => {
     if (open) setMobileSearchOpen(false);
@@ -53,29 +53,19 @@ function Navbar() {
     setMobileSearchOpen(open);
   };
 
-  // Keep background from scrolling when mobile layers are open and allow escape key to close them.
+  // Allow escape key to close search.
   React.useEffect(() => {
-    const shouldLock = mobileSearchOpen; 
-
-    if (shouldLock) {
-      previousOverflow.current = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = previousOverflow.current || "";
-    }
-
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         setMobileSearchOpen(false);
       }
     };
 
-    if (shouldLock) {
+    if (mobileSearchOpen) {
       document.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
-      document.body.style.overflow = previousOverflow.current || "";
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [mobileSearchOpen]);
