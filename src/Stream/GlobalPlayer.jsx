@@ -34,6 +34,7 @@ function GlobalPlayer() {
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [interactionToggle, setInteractionToggle] = useState(0);
+  const [isRotated, setIsRotated] = useState(false);
 
   // Refs
   const preloadTimeoutRef = useRef(null);
@@ -305,7 +306,7 @@ function GlobalPlayer() {
 
 
   // --- Fullscreen & Orientation Logic ---
-  const [isRotated, setIsRotated] = useState(false); // CSS rotation fallback for iOS/Mobile
+
 
   const toggleFullscreen = async () => {
     try {
@@ -358,6 +359,26 @@ function GlobalPlayer() {
       }
   }, [controlsVisible, showEpisodeList, interactionToggle]);
 
+  const pauseVideo = (id) => {
+    const iframe = document.getElementById(`iframe-${id}`);
+    if (iframe && iframe.contentWindow) {
+      const commands = [
+          '{"event":"command","func":"pauseVideo","args":""}', // YouTube
+          JSON.stringify({ method: 'pause' }), // Vimeo
+          JSON.stringify({ type: 'pause' }), // Generic
+          JSON.stringify({ action: 'pause' }) // Generic
+      ];
+      commands.forEach(cmd => {
+          iframe.contentWindow.postMessage(cmd, '*');
+      });
+    }
+  };
+
+
+
+  // Pause helper removed as we are unmounting.
+  // Unmounting guarantees audio stop.
+
   if (sessions.length === 0) return null;
 
   return (
@@ -376,8 +397,9 @@ function GlobalPlayer() {
                     visibility: session.id === activeId ? 'visible' : 'hidden',
                 }}
             >
-                {session.playerSrc && (
+                {session.playerSrc && session.id === activeId && (
                     <iframe 
+                        id={`iframe-${session.id}`}
                         src={session.playerSrc}
                         className="w-full h-full border-0"
                         allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *"
@@ -394,40 +416,54 @@ function GlobalPlayer() {
                 className={`absolute inset-0 z-[101] pointer-events-none transition-transform duration-300 ${isRotated ? 'rotate-90 origin-center w-[100vh] h-[100vw] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
              >
                  {/* Interaction Zone (Top 25% relative to rotation) */}
+                 {/* Interaction Zone (Full Screen Overlay) 
+                    - When Controls Hidden: pointer-events-auto (Captures tap to show controls)
+                    - When Controls Visible: pointer-events-none (Allows clicks to pass through to iframe)
+                 */}
                  <div 
-                    className={`absolute top-0 inset-x-0 h-1/4 pointer-events-auto transition-opacity duration-200 ${controlsVisible ? 'opacity-0' : 'opacity-0 cursor-none'}`}
+                    className={`absolute inset-0 z-0 transition-colors duration-200 ${controlsVisible ? 'pointer-events-none bg-transparent' : 'pointer-events-auto bg-transparent'}`}
+                    onClick={(e) => {
+                        if (!controlsVisible) {
+                            showControls();
+                        }
+                    }}
                     onMouseMove={showControls}
-                    onClick={showControls}
                  />
 
                  {/* Top Bar */}
-                 <div className={`absolute top-4 left-4 flex gap-3 pointer-events-auto transition-opacity duration-300 ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
-                    <button onClick={() => {
+                 {/* Top Bar - Z-Index boosted to sit above overlay */}
+                 <div className={`absolute top-0 left-0 w-full p-2 md:p-4 flex gap-2 md:gap-3 pointer-events-none transition-opacity duration-300 z-10 ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
+                     <button onClick={() => {
                         if (isFullscreenMode) {
                             toggleFullscreen();
                         } else if(isInlinePlay) {
+                            pauseVideo(activeId); // Pause before leaving
                             // Clear param
                             const newParams = new URLSearchParams(searchParams);
                             newParams.delete('play');
                             navigate({ search: newParams.toString() }, { replace: true });
-                        } else {
-                            navigate(-1);
-                        }
-                     }} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                        {isFullscreenMode ? '✕ Exit' : '✕ Close'}
-                     </button>
-                    {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
-                        <button onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">☰ Episodes</button>
-                    )}
-                    {!isFullscreenMode && (
-                        <button onClick={toggleFullscreen} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md hidden md:block">Fullscreen</button>
-                    )}
-                    {/* Mobile Only Buttons */}
-                    <div className="flex md:hidden gap-3">
-                         {!isFullscreenMode && (
-                             <button onClick={toggleFullscreen} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">⛶</button>
-                         )}
-                    </div>
+                         } else {
+                             pauseVideo(activeId); // Pause before leaving
+                             navigate(-1);
+                         }
+                      }} className="bg-black/50 hover:bg-black/70 text-white px-3 py-1.5 md:px-5 md:py-2 rounded-full border border-white/10 backdrop-blur-md min-w-[60px] md:min-w-[90px] text-xs md:text-sm font-medium active:scale-95 transition-transform shadow-lg pointer-events-auto">
+                         {isFullscreenMode ? '✕ Exit' : '‹ Back'}
+                      </button>
+                     {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
+                         <button onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }} className="bg-black/50 hover:bg-black/70 text-white px-3 py-1.5 md:px-5 md:py-2 rounded-full border border-white/10 backdrop-blur-md min-w-[70px] md:min-w-[100px] text-xs md:text-sm font-medium active:scale-95 transition-transform shadow-lg pointer-events-auto">Eps</button>
+                     )}
+                     {!isFullscreenMode && (
+                         <button onClick={toggleFullscreen} className="bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md hidden md:block text-sm font-medium active:scale-95 transition-transform shadow-lg pointer-events-auto">Fullscreen</button>
+                     )}
+                     {/* Mobile Only Buttons - Compact */}
+                     <div className="flex md:hidden gap-2 pointer-events-auto">
+                          {!isFullscreenMode && (
+                              <button onClick={toggleFullscreen} className="bg-black/50 text-white w-8 h-8 flex items-center justify-center rounded-full border border-white/10 backdrop-blur-md active:scale-95 transition-transform shadow-lg"><span className="text-sm">⛶</span></button>
+                          )}
+                          {isFullscreenMode && (
+                              <button onClick={() => setIsRotated(p => !p)} className="bg-black/50 text-white w-8 h-8 flex items-center justify-center rounded-full border border-white/10 backdrop-blur-md active:scale-95 transition-transform shadow-lg"><span className="text-sm">↻</span></button>
+                          )}
+                     </div>
                  </div>
 
                  {/* Episode List */}

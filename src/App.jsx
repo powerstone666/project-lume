@@ -16,10 +16,20 @@ import GlobalPlayer from './Stream/GlobalPlayer';
 function App() {
   const location = useLocation();
   
+
   // Scroll to top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // Request Notification Permission for PWA Updates
+  useEffect(() => {
+      if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().then(perm => {
+              console.log('Notification permission:', perm);
+          });
+      }
+  }, []);
 
   return (
     <>

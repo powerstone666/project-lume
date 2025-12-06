@@ -23,6 +23,26 @@ const recommendationsCache = new Map();
 const seasonCache = new Map();
 const searchCache = new Map();
 
+// --- Adult Mode State ---
+export const getAdultMode = () => false; // Feature Scrapped: Always false
+
+export const setAdultMode = (enabled) => {
+    // No-op
+};
+
+export const clearAllCaches = () => {
+    trendingIndiaMoviesCache = { data: null, lastFetched: 0 };
+    trendingIndiaShowsCache = { data: null, lastFetched: 0 };
+    trendingTodayCache.movie = { data: null, lastFetched: 0 };
+    trendingTodayCache.tv = { data: null, lastFetched: 0 };
+    discoverCache.clear();
+    detailsCache.clear();
+    recommendationsCache.clear();
+    seasonCache.clear();
+    searchCache.clear();
+};
+
+
 async function fetchJson(url) {
   const apiKey = import.meta.env.VITE_TMDB_API_KEY;
 
@@ -48,12 +68,16 @@ async function fetchJson(url) {
 function filterUnreleased(results) {
   if (!Array.isArray(results)) return [];
   const today = new Date().toISOString().slice(0, 10);
+
   return results.filter((item) => {
+    // 1. Standard Filter: Remove explicit adult content
+    if (item.adult) return false;
+
+    // 2. Date Filter
     const date = item.release_date || item.first_air_date;
-    // Keep items with no date (assume released/legacy) or date <= today
-    // If you want to be strict and hide items with NO date, remove the `!date ||` part.
-    // Usually, unreleased items have a future date.
-    return !date || date <= today;
+    // Strict Filter: Must have a date AND be in the past.
+    // Excluding items with NO date (often 'Planned') to satisfy "filter out unreleased" request.
+    return date && date <= today;
   });
 }
 
@@ -73,7 +97,7 @@ export async function searchMulti(query, { page = 1 } = {}) {
 
   const params = new URLSearchParams({
     query: trimmed,
-    include_adult: 'false',
+    include_adult: getAdultMode() ? 'true' : 'false',
     page: String(page),
     language: 'en-IN',
   });
@@ -176,7 +200,7 @@ export async function fetchDiscoverMedia({
 
   const baseParams = {
     sort_by: params.sort_by || 'popularity.desc',
-    include_adult: 'false',
+    include_adult: getAdultMode() ? 'true' : 'false',
     'vote_average.gte':
       params['vote_average.gte'] != null ? params['vote_average.gte'] : 5,
     'vote_count.gte':
@@ -213,7 +237,7 @@ export async function fetchDiscoverMedia({
     lastFetched: Date.now(),
   });
 
-  return results;
+  return filterUnreleased(results);
 }
 
 export async function fetchTrendingTodayMedia(mediaType = 'movie', { forceRefresh = false } = {}) {
