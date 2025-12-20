@@ -78,9 +78,9 @@ function GlobalPlayer() {
                 // Check if exists
                 const existingIdx = prev.findIndex(s => s.id === id);
                 if (existingIdx !== -1) {
-                    // Update timestamp/priority
+                    // Update timestamp/priority and mark as loading to refetch with new params
                     const updated = [...prev];
-                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now() };
+                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now(), loading: true };
                     return updated;
                 }
 
@@ -105,6 +105,26 @@ function GlobalPlayer() {
         }, 0);
     }
   }, [mediaType, id, activeId, shouldBeActive]);
+
+  // --- Update episode when URL params change ---
+  useEffect(() => {
+    if (!activeId || !shouldBeActive) return;
+    if (!urlSeason && !urlEpisode) return;
+    
+    const session = sessions.find(s => s.id === activeId);
+    if (!session || session.loading) return;
+    
+    // Check if season or episode changed from current
+    const seasonNum = urlSeason ? parseInt(urlSeason) : session.selectedSeason;
+    const episodeNum = urlEpisode ? parseInt(urlEpisode) : session.selectedEpisodeNumber;
+    
+    if (seasonNum === session.selectedSeason && episodeNum === session.selectedEpisodeNumber) return;
+    
+    // Mark as loading to refetch
+    setSessions(prev => prev.map(s => 
+      s.id === activeId ? { ...s, loading: true } : s
+    ));
+  }, [urlSeason, urlEpisode, activeId, shouldBeActive, sessions]);
 
   // --- Data Fetching for Active Session ---
   useEffect(() => {
@@ -175,7 +195,7 @@ function GlobalPlayer() {
 
       loadData();
 
-  }, [activeId, sessions, navigate]);
+  }, [activeId, sessions, navigate, urlSeason, urlEpisode]);
 
   // --- Helper: Update current session selection ---
   const updateSessionEpisode = (epNum) => {
