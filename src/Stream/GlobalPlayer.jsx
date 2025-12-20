@@ -16,6 +16,8 @@ function GlobalPlayer() {
   // Check for inline play signal
   const searchParams = new URLSearchParams(location.search);
   const isInlinePlay = !!streamMatch && searchParams.get('play') === '1';
+  const urlSeason = searchParams.get('season');
+  const urlEpisode = searchParams.get('episode');
   
   const currentMatch = watchMatch || (isInlinePlay ? streamMatch : null) || streamMatch; // Keep streamMatch for preloading if needed
   const isWatchPage = !!watchMatch;
@@ -34,9 +36,6 @@ function GlobalPlayer() {
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [interactionToggle, setInteractionToggle] = useState(0);
-
-  // Refs
-  const preloadTimeoutRef = useRef(null);
 
   // --- Optimization: Preconnect ---
   useEffect(() => {
@@ -107,7 +106,6 @@ function GlobalPlayer() {
     }
   }, [mediaType, id, activeId, shouldBeActive]);
 
-
   // --- Data Fetching for Active Session ---
   useEffect(() => {
       if (!activeId) return;
@@ -133,10 +131,10 @@ function GlobalPlayer() {
             title = d.title || d.name;
 
             if (session.mediaType === 'tv' || session.mediaType === 'anime') {
-                season = 1;
+                season = urlSeason ? parseInt(urlSeason) : 1;
                 const sData = await fetchSeasonDetails(session.id, season);
                 tvEpisodes = sData.episodes || [];
-                episode = sData.episodes?.[0]?.episode_number || 1;
+                episode = urlEpisode ? parseInt(urlEpisode) : (sData.episodes?.[0]?.episode_number || 1);
             }
 
             // Construct Src
@@ -177,24 +175,7 @@ function GlobalPlayer() {
 
       loadData();
 
-  }, [activeId, sessions, navigate]); // Careful with dependency loops, but 'loading' flag guards it
-
-
-  // --- Timeout Logic (Global) ---
-  useEffect(() => {
-      if (isStreamPage) {
-           if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
-           preloadTimeoutRef.current = setTimeout(() => {
-               console.log("Preload timeout - Clearing sessions to save resources");
-               setSessions([]); // Clear all if timeout (user left it open)
-               setActiveId(null);
-           }, 300000);
-      } else {
-           if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
-      }
-      return () => { if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current); };
-  }, [isStreamPage]);
-
+  }, [activeId, sessions, navigate]);
 
   // --- Helper: Update current session selection ---
   const updateSessionEpisode = (epNum) => {
@@ -381,13 +362,14 @@ function GlobalPlayer() {
         {/* Global Controls Overlay (Only for Active Session) */}
         {isVisible && activeSession && (
              <div 
-                className={`absolute inset-0 z-[101] pointer-events-none transition-transform duration-300 ${isRotated ? 'rotate-90 origin-center w-[100vh] h-[100vw] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
+                className={`absolute inset-0 z-[101] transition-transform duration-300 ${isRotated ? 'rotate-90 origin-center w-[100vh] h-[100vw] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
+                style={{ pointerEvents: 'none' }}
              >
                  {/* Interaction Zone (Full Screen) - Shows controls on tap, passes through when visible */}
                  <div 
                     className={`absolute inset-0 transition-opacity duration-200 ${controlsVisible ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}`}
-                    onMouseMove={() => !controlsVisible && showControls()}
                     onClick={() => !controlsVisible && showControls()}
+                    onMouseMove={() => !controlsVisible && showControls()}
                  />
 
                  {/* Top Bar */}

@@ -545,7 +545,7 @@ function Stream() {
                     }`}
                     onClick={() => {
                       setSelectedEpisodeNumber(ep.episode_number);
-                      setSearchParams({ play: '1' });
+                      setSearchParams({ play: '1', season: selectedSeason.toString(), episode: ep.episode_number.toString() });
                     }}
                   >
                     {still && (
