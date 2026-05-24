@@ -237,9 +237,9 @@ function Stream() {
       const firstEpisodeNumber =
         (tvEpisodes[0] && tvEpisodes[0].episode_number) || 1;
       const episodeNumber = selectedEpisodeNumber || firstEpisodeNumber;
-      playerSrc = `${cinemaOsBaseUrl}/${id}/${seasonNum}/${episodeNumber}?autoplay=1&sidebar=0&mix=0`;
+      playerSrc = `${cinemaOsBaseUrl}/${id}/${seasonNum}/${episodeNumber}`;
     } else {
-      playerSrc = `${cinemaOsBaseUrl}/${id}?autoplay=1&sidebar=0&mix=0`;
+      playerSrc = `${cinemaOsBaseUrl}/${id}`;
     }
   }
 

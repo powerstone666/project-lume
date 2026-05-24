@@ -49,6 +49,19 @@ body {
   font-weight: 700;
 }
 
+/* Hide scrollbar when player is active */
+html.player-active,
+html.player-active body {
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.player-active::-webkit-scrollbar,
+html.player-active body::-webkit-scrollbar {
+  display: none;
+}
+
 .cards-row-swiper .swiper-button-prev.swiper-button-disabled,
 .cards-row-swiper .swiper-button-next.swiper-button-disabled {
   opacity: 0;

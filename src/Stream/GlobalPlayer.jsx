@@ -80,7 +80,7 @@ function GlobalPlayer() {
                 if (existingIdx !== -1) {
                     // Update timestamp/priority and mark as loading to refetch with new params
                     const updated = [...prev];
-                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now(), loading: true };
+                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now(), loading: true, playerReady: false };
                     return updated;
                 }
 
@@ -96,7 +96,8 @@ function GlobalPlayer() {
                     loaded: false,
                     lastUsed: Date.now(),
                     playerSrc: '', // Computed later
-                    loading: true // Metadata loading
+                    loading: true, // Metadata loading
+                    playerReady: false // Waiting for cinemaOS to signal ready
                 };
 
                 // Single session mode - replace instead of append
@@ -161,10 +162,10 @@ function GlobalPlayer() {
             let src = '';
             if (session.mediaType === 'tv' || session.mediaType === 'anime') {
                  if (season && episode) {
-                     src = `${cinemaOsBaseUrl}/${session.id}/${season}/${episode}?autoplay=1&sidebar=0&mix=0`;
+                     src = `${cinemaOsBaseUrl}/${session.id}/${season}/${episode}`;
                  }
             } else {
-                 src = `${cinemaOsBaseUrl}/${session.id}?autoplay=1&sidebar=0&mix=0`;
+                 src = `${cinemaOsBaseUrl}/${session.id}`;
             }
 
             // Update Session
@@ -185,8 +186,7 @@ function GlobalPlayer() {
             }));
 
           } catch (e) {
-              console.error("Session load failed", e);
-              // Remove failed session?
+              // Ignore session load errors
               setSessions(prev => prev.filter(s => s.id !== session.id));
               // Redirect back?
               navigate(-1);
@@ -197,12 +197,36 @@ function GlobalPlayer() {
 
   }, [activeId, sessions, navigate, urlSeason, urlEpisode]);
 
+  // Listen for cinemaOS PLAYER_EVENT to detect when video is actually playing
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin !== 'https://cinemaos.tech') return;
+      
+      const data = event.data;
+      if (data?.type === 'PLAYER_EVENT' && data?.data) {
+        const eventData = data.data;
+        // When we get timeupdate with playing=true, the video is streaming
+        if (eventData.event === 'timeupdate' && eventData.playing) {
+          setSessions(prev => prev.map(s => {
+            if (s.id === activeId) {
+              return { ...s, playerReady: true };
+            }
+            return s;
+          }));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeId]);
+
   // --- Helper: Update current session selection ---
   const updateSessionEpisode = (epNum) => {
       setSessions(prev => prev.map(s => {
           if (s.id === activeId) {
-             const src = `${cinemaOsBaseUrl}/${s.id}/${s.selectedSeason}/${epNum}?autoplay=1&sidebar=0&mix=0`;
-             return { ...s, selectedEpisodeNumber: epNum, playerSrc: src };
+             const src = `${cinemaOsBaseUrl}/${s.id}/${s.selectedSeason}/${epNum}`;
+              return { ...s, selectedEpisodeNumber: epNum, playerSrc: src, playerReady: false };
           }
           return s;
       }));
@@ -218,6 +242,11 @@ function GlobalPlayer() {
     const handleFsChange = () => {
         const isFs = !!document.fullscreenElement || !!document.webkitFullscreenElement;
         setIsFullscreenMode(isFs);
+        if (isFs) {
+            document.documentElement.classList.add('player-active');
+        } else if (!isVisible) {
+            document.documentElement.classList.remove('player-active');
+        }
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
@@ -225,10 +254,17 @@ function GlobalPlayer() {
         document.removeEventListener('fullscreenchange', handleFsChange);
         document.removeEventListener('webkitfullscreenchange', handleFsChange);
     };
-  }, []);
+  }, [isVisible]);
 
   // --- Inline Docking (Absolute Strategy) ---
-  const [dockStyle, setDockStyle] = useState(null);
+  const [dockStyle, setDockStyle] = useState(() => {
+    // Try to restore last known position from sessionStorage
+    try {
+      const saved = sessionStorage.getItem('lume-inline-player-style');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return null;
+  });
   
   useEffect(() => {
     if (isInlinePlay && !isFullscreenMode) {
@@ -241,14 +277,17 @@ function GlobalPlayer() {
                 const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
                 
                 // Use absolute positioning relative to document
-                setDockStyle({
+                const newStyle = {
                     position: 'absolute',
                     top: rect.top + scrollTop,
                     left: rect.left + scrollLeft,
                     width: rect.width,
                     height: rect.height,
                     zIndex: 50
-                });
+                };
+                setDockStyle(newStyle);
+                // Save to sessionStorage for refresh persistence
+                sessionStorage.setItem('lume-inline-player-style', JSON.stringify(newStyle));
             }
         };
 
@@ -271,6 +310,7 @@ function GlobalPlayer() {
         };
     } else {
         setTimeout(() => setDockStyle(null), 0);
+        sessionStorage.removeItem('lume-inline-player-style');
     }
   }, [isInlinePlay, isFullscreenMode, isVisible]); // Recalculate if visibility changes (page load)
 
@@ -321,7 +361,7 @@ function GlobalPlayer() {
          if (screen.orientation?.unlock) screen.orientation.unlock();
          setIsRotated(false); // Reset rotation on exit
       }
-    } catch(e) { console.warn(e); }
+    } catch(e) { /* ignore */ }
   };
   
   // Clean up rotation/fullscreen on unmount/visibility change
@@ -329,12 +369,17 @@ function GlobalPlayer() {
     if (!isVisible) {
          if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
          setTimeout(() => setIsRotated(false), 0);
-         document.body.style.overflow = '';
-    } else {
-         document.body.style.overflow = 'hidden';
-         // Auto-fullscreen removed as per user request ("play here itself unless we click full screen")
     }
   }, [isVisible]);
+
+  // Hide scrollbar only when browser is in fullscreen mode
+  useEffect(() => {
+    if (isFullscreenMode) {
+      document.documentElement.classList.add('player-active');
+    } else {
+      document.documentElement.classList.remove('player-active');
+    }
+  }, [isFullscreenMode]);
 
 
   // Controls Visibility
@@ -371,7 +416,7 @@ function GlobalPlayer() {
                     <iframe 
                         src={session.playerSrc}
                         className="w-full h-full border-0"
-                        allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *"
+                        allow="autoplay *; encrypted-media *; picture-in-picture *"
                         sandbox="allow-same-origin allow-scripts allow-forms"
                         data-block-popups="true"
                     />
@@ -428,38 +473,60 @@ function GlobalPlayer() {
                     </div>
                  </div>
 
-                 {/* Episode List */}
-                 {showEpisodeList && (
-                     <div className="absolute top-16 left-4 bottom-4 w-80 bg-black/95 border border-white/10 rounded-xl pointer-events-auto flex flex-col p-4 animate-in slide-in-from-left-5">
-                         <div className="flex justify-between mb-4 text-white font-bold">
-                             <h3>Episodes</h3>
-                             <button onClick={() => setShowEpisodeList(false)}>✕</button>
-                         </div>
-                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
-                             {activeSession.tvEpisodes.map(ep => (
-                                 <button 
-                                    key={ep.id}
-                                    onClick={() => {
-                                        updateSessionEpisode(ep.episode_number);
-                                        setShowEpisodeList(false);
-                                    }}
-                                    className={`w-full text-left p-3 rounded hover:bg-white/10 ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-[#9146FF] text-white' : 'text-gray-400'}`}
-                                 >
-                                     <div className="text-sm font-medium">{ep.episode_number}. {ep.name}</div>
-                                 </button>
-                             ))}
-                         </div>
-                     </div>
-                 )}
-                 
-                 {/* Loading Indicator */}
-                 {(activeSession.loading || !activeSession.playerSrc) && (
-                     <div className="absolute inset-0 flex items-center justify-center bg-black">
-                         <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full" />
-                     </div>
-                 )}
-             </div>
-        )}
+                  {/* Episode List */}
+                  {showEpisodeList && (
+                      <div className="absolute top-16 left-4 bottom-4 w-80 bg-black/95 border border-white/10 rounded-xl pointer-events-auto flex flex-col p-4 animate-in slide-in-from-left-5">
+                          <div className="flex justify-between mb-4 text-white font-bold">
+                              <h3>Episodes</h3>
+                              <button onClick={() => setShowEpisodeList(false)}>✕</button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
+                              {activeSession.tvEpisodes.map(ep => (
+                                  <button 
+                                     key={ep.id}
+                                     onClick={() => {
+                                         updateSessionEpisode(ep.episode_number);
+                                         setShowEpisodeList(false);
+                                     }}
+                                     className={`w-full text-left p-3 rounded hover:bg-white/10 ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-[#9146FF] text-white' : 'text-gray-400'}`}
+                                  >
+                                      <div className="text-sm font-medium">{ep.episode_number}. {ep.name}</div>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
+         )}
+
+          {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
+          {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-[200] pointer-events-auto">
+                  <button 
+                      onClick={() => {
+                          if (isFullscreenMode) {
+                              toggleFullscreen();
+                          } else if(isInlinePlay) {
+                              setSessions([]);
+                              setActiveId(null);
+                              const newParams = new URLSearchParams(searchParams);
+                              newParams.delete('play');
+                              navigate({ search: newParams.toString() }, { replace: true });
+                          } else {
+                              setSessions([]);
+                              setActiveId(null);
+                              navigate(-1);
+                          }
+                      }} 
+                      className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md z-[300]"
+                  >
+                      {isWatchPage ? '✕ Exit' : '✕ Close'}
+                  </button>
+                  <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full mb-4" />
+                  <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
+                  <p className="text-gray-400 text-sm text-center max-w-xs">Initial playback may take a few moments.</p>
+              </div>
+          )}
     </div>
   );
 }

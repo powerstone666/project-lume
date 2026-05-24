@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
+import IframePlayerProxy from './IframePlayerProxy';
 
 const cinemaOsBaseUrl = 'https://cinemaos.tech/player';
 
@@ -26,7 +27,7 @@ function VideoPlayer() {
           }
         }
       } catch (e) {
-        console.error("Failed to parse session data", e);
+        // Ignore parse errors
       }
     }
     return null;
@@ -40,10 +41,6 @@ function VideoPlayer() {
   const [selectedSeason, setSelectedSeason] = useState(initialData.selectedSeason || (mediaType === 'tv' || mediaType === 'anime' ? 1 : null));
   const [selectedEpisodeNumber, setSelectedEpisodeNumber] = useState(initialData.selectedEpisodeNumber || (mediaType === 'tv' || mediaType === 'anime' ? 1 : null));
   const [title, setTitle] = useState(initialData.title || initialData.details?.title || initialData.details?.name || '');
-  
-  // If we have minimal data (like just ID but no details), we might need to load.
-  // But if we have details, we are not loading.
-  const [isPlayerLoading, setIsPlayerLoading] = useState(!initialData.details);
 
   // UI State
   const [controlsVisible, setControlsVisible] = useState(false);
@@ -60,7 +57,6 @@ function VideoPlayer() {
       // Only fetch if we don't have details
       if (!details) {
         try {
-            setIsPlayerLoading(true);
             const data = await fetchMediaDetails(mediaType, id);
             setDetails(data);
             setTitle(data.title || data.name);
@@ -72,9 +68,8 @@ function VideoPlayer() {
                 setTvEpisodes(seasonData.episodes || []);
                 setSelectedEpisodeNumber(seasonData.episodes?.[0]?.episode_number || 1);
             }
-            setIsPlayerLoading(false);
         } catch (err) {
-            console.error("Failed to fetch media details", err);
+            // Ignore fetch errors
         }
       }
     };
@@ -88,11 +83,11 @@ function VideoPlayer() {
 
     if (mediaType === 'tv' || mediaType === 'anime') {
         if (selectedSeason && selectedEpisodeNumber) {
-            return `${cinemaOsBaseUrl}/${id}/${selectedSeason}/${selectedEpisodeNumber}?autoplay=1&sidebar=0&mix=0`;
+            return `${cinemaOsBaseUrl}/${id}/${selectedSeason}/${selectedEpisodeNumber}`;
         }
         return '';
     } else {
-        return `${cinemaOsBaseUrl}/${id}?autoplay=1&sidebar=0&mix=0`;
+        return `${cinemaOsBaseUrl}/${id}`;
     }
   }, [mediaType, id, selectedSeason, selectedEpisodeNumber]);
 
@@ -112,7 +107,7 @@ function VideoPlayer() {
         await screen.orientation.lock('landscape');
       }
     } catch (err) {
-      console.warn('Fullscreen or orientation lock failed:', err);
+      // Ignore fullscreen errors
     }
   };
 
@@ -130,7 +125,7 @@ function VideoPlayer() {
         screen.orientation.unlock();
       }
     } catch (err) {
-      console.warn('Exit fullscreen or orientation unlock failed:', err);
+      // Ignore fullscreen errors
     }
   };
 
@@ -226,7 +221,6 @@ function VideoPlayer() {
               e.stopPropagation();
               setInteractionToggle(prev => prev + 1);
               setShowNextButton(false);
-              setIsPlayerLoading(true);
 
               if (hasNextInSeason) {
                 const nextEp = tvEpisodes[currentEpIndex + 1];
@@ -239,11 +233,9 @@ function VideoPlayer() {
                 fetchSeasonDetails(id, nextSeasonNum).then(data => {
                     setTvEpisodes(data.episodes || []);
                     setSelectedEpisodeNumber(data.episodes?.[0]?.episode_number || 1);
-                    setIsPlayerLoading(false); // Done loading new season
                 });
                 return; // Return early as fetch is async
               }
-              // If simple episode swap, we are "loading" until iframe loads
             }}
             className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-black/60 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white text-xs md:text-sm font-medium shadow-lg transition-all"
           >
@@ -322,7 +314,6 @@ function VideoPlayer() {
                     setInteractionToggle(prev => prev + 1);
                     setShowNextButton(false);
                     setSelectedEpisodeNumber(ep.episode_number);
-                    setIsPlayerLoading(true);
                     setShowEpisodeList(false);
                   }}
                   className={`w-full text-left p-3 rounded-lg flex gap-3 transition-colors ${
@@ -350,25 +341,14 @@ function VideoPlayer() {
 
         <div className="absolute inset-0">
           {playerSrc && (
-            <iframe
-                ref={iframeRef}
-                title={title || 'Video Player'}
+            <>
+              <IframePlayerProxy
                 src={playerSrc}
-                className="w-full h-full border-0"
-                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                sandbox="allow-same-origin allow-scripts allow-forms"
-                referrerPolicy="no-referrer"
-                onLoad={() => setIsPlayerLoading(false)}
-                loading="eager"
-                fetchpriority="high"
-                importance="high"
-                data-block-popups="true"
-                style={{
-                WebkitOverflowScrolling: 'touch',
-                transform: 'scale(1.02)', // Zoom slightly to crop sidebar/edges
-                }}
-            />
+                title={title || 'Video Player'}
+              />
+            </>
           )}
+          {!playerSrc && null}
           
           {/* Transparent click capture layer */}
           <div 
@@ -380,15 +360,6 @@ function VideoPlayer() {
             onClick={handlePlayerClick}
             onTouchStart={handlePlayerClick}
           />
-          
-          {isPlayerLoading && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black z-20">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-12 w-12 md:h-16 md:w-16 rounded-full border-4 border-[#9146FF] border-t-transparent animate-spin" />
-                <p className="text-white text-sm md:text-base">Loading player...</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
