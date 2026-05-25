@@ -11,6 +11,7 @@ function GlobalPlayer() {
 
   // Detect mobile devices
   const [isMobile, setIsMobile] = useState(false);
+  const [cinemaOSReady, setCinemaOSReady] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
@@ -216,6 +217,10 @@ function GlobalPlayer() {
       const data = event.data;
       if (data?.type === 'PLAYER_EVENT' && data?.data) {
         const eventData = data.data;
+        
+        // CinemaOS iframe is alive and ready
+        setCinemaOSReady(true);
+        
         // When we get timeupdate with playing=true, OR any play event, the video is streaming
         if ((eventData.event === 'timeupdate' && eventData.playing) || 
             eventData.event === 'play' || 
@@ -234,6 +239,11 @@ function GlobalPlayer() {
     return () => window.removeEventListener('message', handleMessage);
   }, [activeId]);
 
+  // Reset cinemaOSReady when active session changes
+  useEffect(() => {
+    setCinemaOSReady(false);
+  }, [activeId]);
+
   // --- Helper: Update current session selection ---
   const updateSessionEpisode = (epNum) => {
       setSessions(prev => prev.map(s => {
@@ -248,9 +258,9 @@ function GlobalPlayer() {
   const activeSession = sessions.find(s => s.id === activeId);
   const isVisible = shouldBeActive && !!activeSession;
 
-  // Fallback: Hide loading screen after 30 seconds even if no event received
+  // Fallback: On mobile, hide loading screen after 3 seconds since autoplay is blocked
   useEffect(() => {
-    if (!isVisible || !activeSession || activeSession.playerReady) return;
+    if (!isVisible || !activeSession || activeSession.playerReady || !isMobile) return;
     
     const timer = setTimeout(() => {
       setSessions(prev => prev.map(s => {
@@ -259,10 +269,10 @@ function GlobalPlayer() {
         }
         return s;
       }));
-    }, 30000); // 30 seconds fallback
+    }, 3000); // 3 seconds for mobile
 
     return () => clearTimeout(timer);
-  }, [isVisible, activeId, activeSession?.playerReady]);
+  }, [isVisible, activeId, activeSession?.playerReady, isMobile]);
 
   // --- Fullscreen State Listener ---
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
@@ -528,8 +538,8 @@ function GlobalPlayer() {
               </div>
          )}
 
-         {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
-         {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
+          {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
+          {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-[200] pointer-events-auto">
                   <button 
                       onClick={() => {
@@ -555,8 +565,8 @@ function GlobalPlayer() {
                    <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
                    <p className="text-gray-400 text-sm text-center max-w-xs mb-4">Initial playback may take a few moments.</p>
                    
-                    {/* Mobile: Tap to dismiss loading and interact with iframe */}
-                    {isMobile && (
+                    {/* Mobile: Show "Tap to Play" only when cinemaOS iframe is ready */}
+                    {isMobile && cinemaOSReady && (
                     <button 
                         onClick={() => {
                             setSessions(prev => prev.map(s => {
@@ -566,7 +576,7 @@ function GlobalPlayer() {
                                 return s;
                             }));
                         }}
-                        className="mt-4 bg-[#9146FF] text-white px-6 py-3 rounded-full font-medium hover:bg-[#772ce8] transition-colors"
+                        className="mt-4 bg-[#9146FF] text-white px-6 py-3 rounded-full font-medium hover:bg-[#772ce8] transition-colors animate-pulse"
                     >
                         Tap to Play
                     </button>
