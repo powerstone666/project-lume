@@ -9,6 +9,17 @@ function GlobalPlayer() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Detect mobile devices
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // --- Route Parsing ---
   const streamMatch = matchPath('/stream/:mediaType/:id', location.pathname);
   const watchMatch = matchPath('/watch/:mediaType/:id', location.pathname);
@@ -205,10 +216,12 @@ function GlobalPlayer() {
       const data = event.data;
       if (data?.type === 'PLAYER_EVENT' && data?.data) {
         const eventData = data.data;
-        // When we get timeupdate with playing=true, the video is streaming
-        if (eventData.event === 'timeupdate' && eventData.playing) {
+        // When we get timeupdate with playing=true, OR any play event, the video is streaming
+        if ((eventData.event === 'timeupdate' && eventData.playing) || 
+            eventData.event === 'play' || 
+            eventData.event === 'playing') {
           setSessions(prev => prev.map(s => {
-            if (s.id === activeId) {
+            if (s.id === activeId || String(s.id) === String(eventData.tmdbId)) {
               return { ...s, playerReady: true };
             }
             return s;
@@ -234,6 +247,22 @@ function GlobalPlayer() {
 
   const activeSession = sessions.find(s => s.id === activeId);
   const isVisible = shouldBeActive && !!activeSession;
+
+  // Fallback: Hide loading screen after 30 seconds even if no event received
+  useEffect(() => {
+    if (!isVisible || !activeSession || activeSession.playerReady) return;
+    
+    const timer = setTimeout(() => {
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeId) {
+          return { ...s, playerReady: true };
+        }
+        return s;
+      }));
+    }, 30000); // 30 seconds fallback
+
+    return () => clearTimeout(timer);
+  }, [isVisible, activeId, activeSession?.playerReady]);
 
   // --- Fullscreen State Listener ---
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
@@ -499,8 +528,8 @@ function GlobalPlayer() {
               </div>
          )}
 
-          {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
-          {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
+         {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
+         {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-[200] pointer-events-auto">
                   <button 
                       onClick={() => {
@@ -522,10 +551,27 @@ function GlobalPlayer() {
                   >
                       {isWatchPage ? '✕ Exit' : '✕ Close'}
                   </button>
-                  <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full mb-4" />
-                  <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
-                  <p className="text-gray-400 text-sm text-center max-w-xs">Initial playback may take a few moments.</p>
-              </div>
+                   <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full mb-4" />
+                   <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
+                   <p className="text-gray-400 text-sm text-center max-w-xs mb-4">Initial playback may take a few moments.</p>
+                   
+                    {/* Mobile: Tap to dismiss loading and interact with iframe */}
+                    {isMobile && (
+                    <button 
+                        onClick={() => {
+                            setSessions(prev => prev.map(s => {
+                                if (s.id === activeId) {
+                                    return { ...s, playerReady: true };
+                                }
+                                return s;
+                            }));
+                        }}
+                        className="mt-4 bg-[#9146FF] text-white px-6 py-3 rounded-full font-medium hover:bg-[#772ce8] transition-colors"
+                    >
+                        Tap to Play
+                    </button>
+                    )}
+               </div>
           )}
     </div>
   );
