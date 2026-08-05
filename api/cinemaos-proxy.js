@@ -4,6 +4,18 @@ const CINEMAOS_ORIGIN = 'https://cinemaos.tech';
 
 const POPUP_BLOCKER_SCRIPT = `
 (() => {
+  const blockerFlag = '__LUME_POPUP_BLOCKER_INSTALLED__';
+  if (window[blockerFlag]) return;
+
+  try {
+    Object.defineProperty(window, blockerFlag, {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
+  } catch {}
+
   const blockedOpen = () => null;
 
   try {
@@ -14,24 +26,38 @@ const POPUP_BLOCKER_SCRIPT = `
       value: blockedOpen,
     });
   } catch {
-    window.open = blockedOpen;
+    try {
+      window.open = blockedOpen;
+    } catch {}
   }
 
   document.addEventListener('click', (event) => {
     const link = event.target.closest?.('a');
-    if (link && link.target && link.target !== '_self') {
+    if (!link) return;
+
+    const target = link.target?.toLowerCase();
+    let isExternal = false;
+    try {
+      isExternal = new URL(link.href, window.location.href).origin !== window.location.origin;
+    } catch {}
+
+    if ((target && target !== '_self') || isExternal) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      link.target = '_self';
     }
   }, true);
 
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (form.target && form.target !== '_self') {
+    const target = form.target?.toLowerCase();
+    let isExternal = false;
+    try {
+      isExternal = new URL(form.action, window.location.href).origin !== window.location.origin;
+    } catch {}
+
+    if ((target && target !== '_self') || isExternal) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      form.target = '_self';
     }
   }, true);
 })();
@@ -87,7 +113,8 @@ export default async function handler(request, response) {
 
     const contentType = upstreamResponse.headers.get('content-type') || 'application/octet-stream';
     const isHtml = contentType.includes('text/html');
-    const isWebpackRuntime = upstreamUrl.pathname.includes('/_next/static/chunks/webpack-');
+    const isWebpackRuntime = upstreamUrl.pathname.includes('/_next/static/chunks/webpack-')
+      && (contentType.includes('javascript') || upstreamUrl.pathname.endsWith('.js'));
 
     if (isHtml) {
       const upstreamHtml = await upstreamResponse.text();
@@ -99,7 +126,7 @@ export default async function handler(request, response) {
       return response.send(html);
     }
 
-    if (isWebpackRuntime && contentType.includes('javascript')) {
+    if (isWebpackRuntime) {
       const runtime = await upstreamResponse.text();
       response.status(upstreamResponse.status);
       response.setHeader('content-type', contentType);

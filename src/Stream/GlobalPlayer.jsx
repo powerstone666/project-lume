@@ -4,22 +4,77 @@ import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
 import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
 
 const MAX_SESSIONS = 1;
+const POPUP_BLOCKER_FLAG = '__LUME_POPUP_BLOCKER_INSTALLED__';
+
+const installPopupBlocker = (iframeWindow) => {
+  if (!iframeWindow || iframeWindow[POPUP_BLOCKER_FLAG]) return;
+
+  try {
+    Object.defineProperty(iframeWindow, POPUP_BLOCKER_FLAG, {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
+  } catch {
+    // Continue installing the blocker if another script reserved the flag.
+  }
+
+  const blockedOpen = () => null;
+  try {
+    Object.defineProperty(iframeWindow, 'open', {
+      configurable: false,
+      enumerable: true,
+      writable: false,
+      value: blockedOpen,
+    });
+  } catch {
+    try {
+      iframeWindow.open = blockedOpen;
+    } catch {
+      // The proxy-injected blocker may already have locked this property.
+    }
+  }
+
+  const iframeDocument = iframeWindow.document;
+  iframeDocument.addEventListener('click', (event) => {
+    const link = event.target.closest?.('a');
+    if (!link) return;
+
+    const target = link.target?.toLowerCase();
+    let isExternal = false;
+    try {
+      isExternal = new URL(link.href, iframeWindow.location.href).origin !== iframeWindow.location.origin;
+    } catch {
+      isExternal = true;
+    }
+
+    if ((target && target !== '_self') || isExternal) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
+  iframeDocument.addEventListener('submit', (event) => {
+    const form = event.target;
+    const target = form.target?.toLowerCase();
+    let isExternal = false;
+    try {
+      isExternal = new URL(form.action, iframeWindow.location.href).origin !== iframeWindow.location.origin;
+    } catch {
+      isExternal = true;
+    }
+
+    if ((target && target !== '_self') || isExternal) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+};
 
 function GlobalPlayer() {
   const location = useLocation();
   const navigate = useNavigate();
-
-  // Detect mobile devices
-  const [isMobile, setIsMobile] = useState(false);
-  const [cinemaOSReady, setCinemaOSReady] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // --- Route Parsing ---
   const streamMatch = matchPath('/stream/:mediaType/:id', location.pathname);
@@ -47,7 +102,6 @@ function GlobalPlayer() {
   const [activeId, setActiveId] = useState(null); 
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
-  const [interactionToggle, setInteractionToggle] = useState(0);
   const playerIframeRef = useRef(null);
 
   const stopPlayback = useCallback(() => {
@@ -57,7 +111,6 @@ function GlobalPlayer() {
 
     setSessions([]);
     setActiveId(null);
-    setCinemaOSReady(false);
     setShowEpisodeList(false);
   }, []);
 
@@ -102,9 +155,13 @@ function GlobalPlayer() {
                 if (existingIdx !== -1) {
                     // Update timestamp/priority and mark as loading to refetch with new params
                     const updated = [...prev];
-                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now(), loading: true, playerReady: false };
+                    updated[existingIdx] = { ...updated[existingIdx], lastUsed: Date.now(), loading: true };
                     return updated;
                 }
+
+                const isEpisodeMedia = mediaType === 'tv' || mediaType === 'anime';
+                const initialSeason = isEpisodeMedia ? (Number(urlSeason) || 1) : null;
+                const initialEpisode = isEpisodeMedia ? (Number(urlEpisode) || 1) : null;
 
                 // Create new session
                 const newSession = {
@@ -112,14 +169,18 @@ function GlobalPlayer() {
                     mediaType,
                     details: null,
                     tvEpisodes: [],
-                    selectedSeason: null,
-                    selectedEpisodeNumber: null,
+                    selectedSeason: initialSeason,
+                    selectedEpisodeNumber: initialEpisode,
                     title: '',
                     loaded: false,
                     lastUsed: Date.now(),
-                    playerSrc: '', // Computed later
-                    loading: true, // Metadata loading
-                    playerReady: false // Waiting for cinemaOS to signal ready
+                    playerSrc: createCinemaOsPlayerUrl({
+                        mediaType,
+                        id,
+                        season: initialSeason,
+                        episode: initialEpisode,
+                    }),
+                    loading: true // Metadata loading
                 };
 
                 // Single session mode - replace instead of append
@@ -127,7 +188,7 @@ function GlobalPlayer() {
             });
         }, 0);
     }
-  }, [mediaType, id, activeId, shouldBeActive, stopPlayback]);
+  }, [mediaType, id, activeId, shouldBeActive, stopPlayback, urlSeason, urlEpisode]);
 
   // --- Update episode when URL params change ---
   useEffect(() => {
@@ -216,44 +277,7 @@ function GlobalPlayer() {
 
   }, [activeId, sessions, navigate, urlSeason, urlEpisode]);
 
-  // Listen for cinemaOS PLAYER_EVENT to detect when video is actually playing
-  useEffect(() => {
-    const handleMessage = (event) => {
-      const trustedOrigins = [window.location.origin, 'https://cinemaos.tech'];
-      if (!trustedOrigins.includes(event.origin)) return;
-      
-      const data = event.data;
-      if (data?.type === 'PLAYER_EVENT' && data?.data) {
-        const eventData = data.data;
-        
-        // CinemaOS iframe is alive and ready
-        setCinemaOSReady(true);
-        
-        // When we get timeupdate with playing=true, OR any play event, the video is streaming
-        if ((eventData.event === 'timeupdate' && eventData.playing) || 
-            eventData.event === 'play' || 
-            eventData.event === 'playing') {
-          setSessions(prev => prev.map(s => {
-            if (s.id === activeId || String(s.id) === String(eventData.tmdbId)) {
-              return { ...s, playerReady: true };
-            }
-            return s;
-          }));
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [activeId]);
-
-  // Reset cinemaOSReady when active session changes
-  useEffect(() => {
-    setCinemaOSReady(false);
-  }, [activeId]);
-
   const selectEpisode = (episodeNumber) => {
-      setCinemaOSReady(false);
       setSessions(prev => prev.map(s => {
           if (s.id === activeId) {
              const src = createCinemaOsPlayerUrl({
@@ -266,7 +290,6 @@ function GlobalPlayer() {
                   ...s,
                   selectedEpisodeNumber: episodeNumber,
                   playerSrc: src,
-                  playerReady: false,
               };
           }
           return s;
@@ -286,22 +309,6 @@ function GlobalPlayer() {
   const activeSession = sessions.find(s => s.id === activeId);
   const isVisible = shouldBeActive && !!activeSession;
 
-  // Fallback: On mobile, hide loading screen after 3 seconds since autoplay is blocked
-  useEffect(() => {
-    if (!isVisible || !activeSession || activeSession.playerReady || !isMobile) return;
-    
-    const timer = setTimeout(() => {
-      setSessions(prev => prev.map(s => {
-        if (s.id === activeId) {
-          return { ...s, playerReady: true };
-        }
-        return s;
-      }));
-    }, 3000); // 3 seconds for mobile
-
-    return () => clearTimeout(timer);
-  }, [isVisible, activeId, activeSession?.playerReady, isMobile]);
-
   // --- Fullscreen State Listener ---
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   
@@ -309,11 +316,6 @@ function GlobalPlayer() {
     const handleFsChange = () => {
         const isFs = !!document.fullscreenElement || !!document.webkitFullscreenElement;
         setIsFullscreenMode(isFs);
-        if (isFs) {
-            document.documentElement.classList.add('player-active');
-        } else if (!isVisible) {
-            document.documentElement.classList.remove('player-active');
-        }
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
@@ -321,7 +323,7 @@ function GlobalPlayer() {
         document.removeEventListener('fullscreenchange', handleFsChange);
         document.removeEventListener('webkitfullscreenchange', handleFsChange);
     };
-  }, [isVisible]);
+  }, []);
 
   // --- Inline Docking (Absolute Strategy) ---
   const [dockStyle, setDockStyle] = useState(() => {
@@ -393,11 +395,10 @@ function GlobalPlayer() {
   // Auto-show controls on mount/change
   useEffect(() => {
      if (isVisible) {
-         setTimeout(() => {
+         const showTimer = setTimeout(() => {
             setControlsVisible(true);
-            const t = setTimeout(() => setControlsVisible(false), 3000);
-            return () => clearTimeout(t);
          }, 0);
+         return () => clearTimeout(showTimer);
      }
   }, [isVisible, isFullscreenMode, isInlinePlay]);
 
@@ -465,27 +466,22 @@ function GlobalPlayer() {
     }
   }, [isVisible]);
 
-  // Hide scrollbar only when browser is in fullscreen mode
+  // A fixed full-viewport player must also lock the page behind it. Inline
+  // playback keeps normal page scrolling until the user enters fullscreen.
   useEffect(() => {
-    if (isFullscreenMode) {
-      document.documentElement.classList.add('player-active');
-    } else {
-      document.documentElement.classList.remove('player-active');
-    }
-  }, [isFullscreenMode]);
+    const shouldLockPageScroll = isVisible && (!isInlinePlay || isFullscreenMode);
+    document.documentElement.classList.toggle('player-active', shouldLockPageScroll);
+
+    return () => document.documentElement.classList.remove('player-active');
+  }, [isVisible, isInlinePlay, isFullscreenMode]);
 
 
-  // Controls Visibility
-  const showControls = () => {
-      setControlsVisible(true);
-      setInteractionToggle(p => p+1);
-  };
   useEffect(() => {
       if(controlsVisible && !showEpisodeList) {
           const t = setTimeout(() => setControlsVisible(false), 3000);
           return () => clearTimeout(t);
       }
-  }, [controlsVisible, showEpisodeList, interactionToggle]);
+  }, [controlsVisible, showEpisodeList]);
 
   if (sessions.length === 0) return null;
 
@@ -511,11 +507,14 @@ function GlobalPlayer() {
                         src={session.playerSrc}
                         className="w-full h-full border-0"
                         allow="autoplay *; encrypted-media *; picture-in-picture *"
-                        onLoad={() => {
-                            setCinemaOSReady(true);
-                            setSessions(prev => prev.map(s =>
-                                s.id === session.id ? { ...s, playerReady: true } : s
-                            ));
+                        onLoad={(event) => {
+                            try {
+                                installPopupBlocker(event.currentTarget.contentWindow);
+                            } catch {
+                                // If an ad navigates the iframe off-origin, restore the player.
+                                event.currentTarget.src = session.playerSrc;
+                                return;
+                            }
                         }}
                     />
                 )}
@@ -528,15 +527,8 @@ function GlobalPlayer() {
                 className={`absolute inset-0 z-[101] transition-transform duration-300 ${isRotated ? 'rotate-90 origin-center w-[100vh] h-[100vw] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
                 style={{ pointerEvents: 'none' }}
              >
-                 {/* Interaction Zone (Full Screen) - Shows controls on tap, passes through when visible */}
-                 <div 
-                    className={`absolute inset-0 transition-opacity duration-200 ${controlsVisible ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}`}
-                    onClick={() => !controlsVisible && showControls()}
-                    onMouseMove={() => !controlsVisible && showControls()}
-                 />
-
                  {/* Top Bar */}
-                 <div className={`absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex items-center justify-between gap-2 pointer-events-auto transition-opacity duration-300 md:left-4 md:right-auto md:top-4 md:justify-start ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
+                 <div className={`absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex items-center justify-between gap-2 transition-opacity duration-300 md:left-4 md:right-auto md:top-4 md:justify-start ${controlsVisible || showEpisodeList ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
                     <div className="flex min-w-0 items-center gap-2">
                         <button
                             type="button"
@@ -620,8 +612,8 @@ function GlobalPlayer() {
               </div>
          )}
 
-          {/* Loading Indicator - Shows until cinemaOS signals it's playing */}
-          {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
+          {/* Loading metadata before the real player iframe can be created. */}
+          {isVisible && activeSession && !activeSession.playerSrc && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-[200] pointer-events-auto">
                   <button 
                       onClick={closePlayer}
@@ -632,23 +624,6 @@ function GlobalPlayer() {
                    <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full mb-4" />
                    <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
                    <p className="text-gray-400 text-sm text-center max-w-xs mb-4">Initial playback may take a few moments.</p>
-                   
-                    {/* Mobile: Show "Tap to Play" only when cinemaOS iframe is ready */}
-                    {isMobile && cinemaOSReady && (
-                    <button 
-                        onClick={() => {
-                            setSessions(prev => prev.map(s => {
-                                if (s.id === activeId) {
-                                    return { ...s, playerReady: true };
-                                }
-                                return s;
-                            }));
-                        }}
-                        className="mt-4 bg-[#9146FF] text-white px-6 py-3 rounded-full font-medium hover:bg-[#772ce8] transition-colors animate-pulse"
-                    >
-                        Tap to Play
-                    </button>
-                    )}
                </div>
           )}
     </div>

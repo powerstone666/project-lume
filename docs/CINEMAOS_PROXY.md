@@ -6,7 +6,7 @@ This document explains how Lume embeds CinemaOS without using an iframe `sandbox
 
 CinemaOS detects restrictive iframe sandbox settings and replaces its player with an "Iframe Sandbox Detected" warning. Removing the sandbox allows the player to load, but it also allows embedded scripts to call `window.open()` and open links in new tabs.
 
-Lume solves this by serving CinemaOS through a same-origin proxy and injecting popup-blocking code into the returned HTML.
+Lume solves this by serving CinemaOS through a same-origin proxy, hooking its webpack runtime, and reinforcing the blocker from the parent player after the iframe loads.
 
 ```text
 Browser iframe
@@ -27,7 +27,7 @@ The `/api/cinemaos` prefix keeps the iframe on Lume's origin. The proxy removes 
 
 ## Popup-blocking layers
 
-The proxy prepends the blocker to CinemaOS's webpack runtime response. The runtime executes before the application chunks, so the blocker is active before CinemaOS code without adding elements to Next.js-managed HTML or causing hydration mismatches.
+The proxy prepends an idempotent blocker only to CinemaOS's webpack runtime. Application chunks are returned byte-for-byte because changing their script prologue can break Next.js bootstrap globals such as `_N_E`. `GlobalPlayer.jsx` reapplies the blocker after the same-origin iframe loads, which covers browser-cached or renamed runtimes without changing Next.js-managed HTML.
 
 ### Blocking `window.open()`
 
@@ -37,11 +37,11 @@ This blocks the most common scripted popup mechanism.
 
 ### Blocking new-window links
 
-A capture-phase click listener checks clicked links. Links targeting `_blank` or another browsing context are prevented before the page's normal click handlers run.
+A capture-phase click listener checks clicked links. Links targeting another browsing context or leaving Lume's proxied origin are prevented before the page's normal click handlers run.
 
 ### Blocking new-window form submissions
 
-A capture-phase submit listener prevents forms whose `target` would open another window or tab.
+A capture-phase submit listener prevents forms that target another browsing context or submit to an external origin.
 
 ## Resource and API forwarding
 
@@ -73,13 +73,14 @@ for Vite deployments: without it, the SPA catch-all can return Lume's
 `index.html` for `/api/cinemaos/...`, causing a second copy of Lume to render
 inside the player iframe.
 
-Both implementations perform the same HTML rewriting and popup-blocker injection.
+Both implementations perform the same HTML rewriting, runtime hook, and parent-side popup blocking.
 
 ## Player readiness
 
-The old CinemaOS embed route emitted `PLAYER_EVENT` messages from `https://cinemaos.tech`. The current proxied `/watch` page may not emit that legacy handshake.
-
-`GlobalPlayer.jsx` therefore marks the player ready when the iframe's `load` event fires. It also accepts valid player messages from Lume's current origin. This removes Lume's loading overlay and allows the user to interact with the player.
+`GlobalPlayer.jsx` creates the CinemaOS iframe URL immediately from the route ID,
+season, and episode. It does not wait for TMDB metadata, a timer, a player event,
+or a custom "Tap to Play" prompt. The iframe receives pointer input directly;
+its `load` event is used only to reinforce popup blocking.
 
 ## What this does and does not block
 
@@ -87,6 +88,7 @@ This implementation blocks:
 
 - Scripted `window.open()` popups.
 - Links that attempt to open another tab or window.
+- Links that attempt to navigate the player to an external origin.
 - Forms that target another tab or window.
 
 It does not automatically block:
@@ -118,7 +120,10 @@ Requests to `/_next/*` must be forwarded to CinemaOS. Confirm the Vite middlewar
 
 ### Streams load but the player remains covered
 
-Confirm the iframe `onLoad` handler in `GlobalPlayer.jsx` sets `playerReady`. Browsers may still require a user click before playing video with sound.
+The active player has no custom readiness cover after `playerSrc` is created. If
+the metadata loader remains visible, confirm session creation produced a valid
+CinemaOS URL. Browsers may still require a direct click on CinemaOS's real play
+control before playing video with sound.
 
 ## Important maintenance note
 
