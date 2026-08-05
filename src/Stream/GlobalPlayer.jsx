@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, matchPath } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
 import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
@@ -48,6 +48,18 @@ function GlobalPlayer() {
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [interactionToggle, setInteractionToggle] = useState(0);
+  const playerIframeRef = useRef(null);
+
+  const stopPlayback = useCallback(() => {
+    if (playerIframeRef.current) {
+      playerIframeRef.current.src = 'about:blank';
+    }
+
+    setSessions([]);
+    setActiveId(null);
+    setCinemaOSReady(false);
+    setShowEpisodeList(false);
+  }, []);
 
   // --- Optimization: Preconnect ---
   useEffect(() => {
@@ -74,10 +86,8 @@ function GlobalPlayer() {
   useEffect(() => {
     // 1. If not in playback mode, clear session
     if (!shouldBeActive) {
-        if (activeId) {
-             setTimeout(() => setActiveId(null), 0);
-        }
-        return; // Don't create sessions unless actively playing
+        const cleanupTimer = setTimeout(stopPlayback, 0);
+        return () => clearTimeout(cleanupTimer);
     }
 
     if (!mediaType || !id) return;
@@ -117,7 +127,7 @@ function GlobalPlayer() {
             });
         }, 0);
     }
-  }, [mediaType, id, activeId, shouldBeActive]);
+  }, [mediaType, id, activeId, shouldBeActive, stopPlayback]);
 
   // --- Update episode when URL params change ---
   useEffect(() => {
@@ -380,6 +390,32 @@ function GlobalPlayer() {
   // --- Fullscreen & Orientation Logic ---
   const [isRotated, setIsRotated] = useState(false); // CSS rotation fallback for iOS/Mobile
 
+  const closePlayer = async () => {
+    stopPlayback();
+
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+        await document.webkitExitFullscreen();
+      }
+      if (screen.orientation?.unlock) screen.orientation.unlock();
+    } catch {
+      // Playback is already stopped; fullscreen cleanup is best effort.
+    }
+
+    setIsRotated(false);
+
+    if (isInlinePlay) {
+      const nextSearchParams = new URLSearchParams(location.search);
+      nextSearchParams.delete('play');
+      navigate({ search: nextSearchParams.toString() }, { replace: true });
+      return;
+    }
+
+    navigate(-1);
+  };
+
   const toggleFullscreen = async () => {
     try {
       // 1. Try Native Fullscreen
@@ -456,6 +492,7 @@ function GlobalPlayer() {
             >
                 {session.playerSrc && (
                     <iframe 
+                        ref={session.id === activeId ? playerIframeRef : null}
                         src={session.playerSrc}
                         className="w-full h-full border-0"
                         allow="autoplay *; encrypted-media *; picture-in-picture *"
@@ -485,25 +522,8 @@ function GlobalPlayer() {
 
                  {/* Top Bar */}
                  <div className={`absolute top-4 left-4 flex gap-3 pointer-events-auto transition-opacity duration-300 ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
-                    <button onClick={() => {
-                        if (isFullscreenMode) {
-                            toggleFullscreen();
-                        } else if(isInlinePlay) {
-                            // Clear session to unmount iframe and allow prefetching
-                            setSessions([]);
-                            setActiveId(null);
-                            // Clear param
-                            const newParams = new URLSearchParams(searchParams);
-                            newParams.delete('play');
-                            navigate({ search: newParams.toString() }, { replace: true });
-                        } else {
-                            // Clear session to unmount iframe
-                            setSessions([]);
-                            setActiveId(null);
-                            navigate(-1);
-                        }
-                     }} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                        {isFullscreenMode ? '✕ Exit' : '✕ Close'}
+                    <button onClick={closePlayer} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                        ✕ Close
                      </button>
                     {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
                         <button onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">☰ Episodes</button>
@@ -549,21 +569,7 @@ function GlobalPlayer() {
           {isVisible && activeSession && (activeSession.loading || !activeSession.playerSrc || !activeSession.playerReady) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-[200] pointer-events-auto">
                   <button 
-                      onClick={() => {
-                          if (isFullscreenMode) {
-                              toggleFullscreen();
-                          } else if(isInlinePlay) {
-                              setSessions([]);
-                              setActiveId(null);
-                              const newParams = new URLSearchParams(searchParams);
-                              newParams.delete('play');
-                              navigate({ search: newParams.toString() }, { replace: true });
-                          } else {
-                              setSessions([]);
-                              setActiveId(null);
-                              navigate(-1);
-                          }
-                      }} 
+                      onClick={closePlayer}
                       className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md z-[300]"
                   >
                       {isWatchPage ? '✕ Exit' : '✕ Close'}

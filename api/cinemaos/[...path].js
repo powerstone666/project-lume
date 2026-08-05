@@ -1,7 +1,8 @@
+import { Readable } from 'node:stream';
+
 const CINEMAOS_ORIGIN = 'https://cinemaos.tech';
 
-const POPUP_BLOCKER = `
-<script>
+const POPUP_BLOCKER_SCRIPT = `
 (() => {
   const blockedOpen = () => null;
 
@@ -34,7 +35,7 @@ const POPUP_BLOCKER = `
     }
   }, true);
 })();
-</script>`;
+`;
 
 const rewriteCinemaOsUrls = (html) => html
   .replaceAll(`${CINEMAOS_ORIGIN}/`, '/api/cinemaos/')
@@ -63,10 +64,11 @@ export default async function handler(request, response) {
 
     const contentType = upstreamResponse.headers.get('content-type') || 'application/octet-stream';
     const isHtml = contentType.includes('text/html');
+    const isWebpackRuntime = upstreamUrl.pathname.includes('/_next/static/chunks/webpack-');
 
     if (isHtml) {
       const upstreamHtml = await upstreamResponse.text();
-      const html = rewriteCinemaOsUrls(upstreamHtml).replace('<head>', `<head>${POPUP_BLOCKER}`);
+      const html = rewriteCinemaOsUrls(upstreamHtml);
 
       response.status(upstreamResponse.status);
       response.setHeader('content-type', 'text/html; charset=utf-8');
@@ -74,16 +76,25 @@ export default async function handler(request, response) {
       return response.send(html);
     }
 
-    const body = Buffer.from(await upstreamResponse.arrayBuffer());
+    if (isWebpackRuntime && contentType.includes('javascript')) {
+      const runtime = await upstreamResponse.text();
+      response.status(upstreamResponse.status);
+      response.setHeader('content-type', contentType);
+      response.setHeader('cache-control', 'no-store');
+      return response.send(`${POPUP_BLOCKER_SCRIPT}\n${runtime}`);
+    }
+
     response.status(upstreamResponse.status);
     response.setHeader('content-type', contentType);
 
-    for (const header of ['cache-control', 'content-length', 'content-range', 'accept-ranges', 'etag']) {
+    for (const header of ['cache-control', 'content-range', 'accept-ranges', 'etag', 'last-modified']) {
       const value = upstreamResponse.headers.get(header);
       if (value) response.setHeader(header, value);
     }
 
-    return response.send(body);
+    if (!upstreamResponse.body) return response.end();
+
+    return Readable.fromWeb(upstreamResponse.body).pipe(response);
   } catch (error) {
     console.error('CinemaOS proxy request failed:', error);
     return response.status(502).json({ error: 'CinemaOS is unavailable' });

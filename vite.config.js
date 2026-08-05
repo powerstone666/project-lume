@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Readable } from 'node:stream'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import react from '@vitejs/plugin-react'
@@ -12,10 +13,9 @@ const CINEMAOS_INTERNAL_API_PREFIXES = [
   '/api/cinemaosv2',
   '/api/moviebox',
   '/api/multi-movies',
-  '/api/tmdb/images',
+  '/api/tmdb',
 ]
-const POPUP_BLOCKER = `
-<script>
+const POPUP_BLOCKER_SCRIPT = `
 (() => {
   const blockedOpen = () => null;
   try {
@@ -45,7 +45,7 @@ const POPUP_BLOCKER = `
     }
   }, true);
 })();
-</script>`
+`
 
 const rewriteCinemaOsUrls = (html) => html
   .replaceAll(`${CINEMAOS_ORIGIN}/`, '/api/cinemaos/')
@@ -81,13 +81,35 @@ const cinemaOsDevProxy = () => ({
           },
         })
         const contentType = upstreamResponse.headers.get('content-type') || 'application/octet-stream'
-        const body = contentType.includes('text/html')
-          ? rewriteCinemaOsUrls(await upstreamResponse.text()).replace('<head>', `<head>${POPUP_BLOCKER}`)
-          : Buffer.from(await upstreamResponse.arrayBuffer())
-
+        const isWebpackRuntime = upstreamPath.includes('/_next/static/chunks/webpack-')
         response.statusCode = upstreamResponse.status
         response.setHeader('content-type', contentType)
-        response.end(body)
+
+        if (contentType.includes('text/html')) {
+          const html = rewriteCinemaOsUrls(await upstreamResponse.text())
+          response.setHeader('cache-control', 'no-store')
+          response.end(html)
+          return
+        }
+
+        if (isWebpackRuntime && contentType.includes('javascript')) {
+          const runtime = await upstreamResponse.text()
+          response.setHeader('cache-control', 'no-store')
+          response.end(`${POPUP_BLOCKER_SCRIPT}\n${runtime}`)
+          return
+        }
+
+        for (const header of ['cache-control', 'content-range', 'accept-ranges', 'etag', 'last-modified']) {
+          const value = upstreamResponse.headers.get(header)
+          if (value) response.setHeader(header, value)
+        }
+
+        if (!upstreamResponse.body) {
+          response.end()
+          return
+        }
+
+        Readable.fromWeb(upstreamResponse.body).pipe(response)
       } catch (error) {
         console.error('CinemaOS dev proxy request failed:', error)
         response.statusCode = 502

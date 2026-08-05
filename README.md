@@ -21,6 +21,7 @@ A modern, beautiful streaming web application for discovering and watching movie
 - **Video Player**: Custom video player with fullscreen support and landscape orientation lock
 - **Cast Support**: Google Cast integration for streaming to compatible devices
 - **Episode Navigation**: Easy navigation between episodes and seasons
+- **CinemaOS Integration**: See the [proxy and popup-blocking methodology](docs/CINEMAOS_PROXY.md)
 
 ### 🎨 User Experience
 

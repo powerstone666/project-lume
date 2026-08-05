@@ -17,8 +17,8 @@
       "destination": "/api/cinemaos/api/multi-movies/:path*"
     },
     {
-      "source": "/api/tmdb/images/:path*",
-      "destination": "/api/cinemaos/api/tmdb/images/:path*"
+      "source": "/api/tmdb/:path*",
+      "destination": "/api/cinemaos/api/tmdb/:path*"
     },
     {
       "source": "/(.*)",
