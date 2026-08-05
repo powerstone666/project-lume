@@ -5,6 +5,7 @@ import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
 
 const MAX_SESSIONS = 1;
 const POPUP_BLOCKER_FLAG = '__LUME_POPUP_BLOCKER_INSTALLED__';
+const PLAYER_INTERACTION_FLAG = '__LUME_PLAYER_INTERACTION_OBSERVER_INSTALLED__';
 
 const installPopupBlocker = (iframeWindow) => {
   if (!iframeWindow || iframeWindow[POPUP_BLOCKER_FLAG]) return;
@@ -72,6 +73,37 @@ const installPopupBlocker = (iframeWindow) => {
   }, true);
 };
 
+const observePlayerInteraction = (iframeWindow, onInteraction) => {
+  if (!iframeWindow || iframeWindow[PLAYER_INTERACTION_FLAG]) return;
+
+  try {
+    Object.defineProperty(iframeWindow, PLAYER_INTERACTION_FLAG, {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
+  } catch {
+    return;
+  }
+
+  const iframeDocument = iframeWindow.document;
+  let lastPointerMove = 0;
+
+  iframeDocument.addEventListener('pointerdown', onInteraction, {
+    capture: true,
+    passive: true,
+  });
+  iframeDocument.addEventListener('pointermove', () => {
+    const now = Date.now();
+    if (now - lastPointerMove < 500) return;
+
+    lastPointerMove = now;
+    onInteraction();
+  }, { capture: true, passive: true });
+  iframeDocument.addEventListener('keydown', onInteraction, true);
+};
+
 function GlobalPlayer() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -102,7 +134,13 @@ function GlobalPlayer() {
   const [activeId, setActiveId] = useState(null); 
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
+  const [interactionToggle, setInteractionToggle] = useState(0);
   const playerIframeRef = useRef(null);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    setInteractionToggle(previous => previous + 1);
+  }, []);
 
   const stopPlayback = useCallback(() => {
     if (playerIframeRef.current) {
@@ -481,7 +519,7 @@ function GlobalPlayer() {
           const t = setTimeout(() => setControlsVisible(false), 3000);
           return () => clearTimeout(t);
       }
-  }, [controlsVisible, showEpisodeList]);
+  }, [controlsVisible, showEpisodeList, interactionToggle]);
 
   if (sessions.length === 0) return null;
 
@@ -510,6 +548,10 @@ function GlobalPlayer() {
                         onLoad={(event) => {
                             try {
                                 installPopupBlocker(event.currentTarget.contentWindow);
+                                observePlayerInteraction(
+                                    event.currentTarget.contentWindow,
+                                    revealControls,
+                                );
                             } catch {
                                 // If an ad navigates the iframe off-origin, restore the player.
                                 event.currentTarget.src = session.playerSrc;
