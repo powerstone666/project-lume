@@ -7,6 +7,7 @@ import {
   fetchSeasonDetails,
   fetchSimilar,
 } from '../Api-services/tmbd';
+import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
 
 function Stream() {
   const { mediaType = 'movie', id } = useParams();
@@ -229,19 +230,14 @@ function Stream() {
         })
       : [];
 
-  const cinemaOsBaseUrl = 'https://cinemaos.tech/player';
-  let playerSrc = null;
-  if (id) {
-    if (mediaType === 'tv' || mediaType === 'anime') {
-      const seasonNum = selectedSeason || 1;
-      const firstEpisodeNumber =
-        (tvEpisodes[0] && tvEpisodes[0].episode_number) || 1;
-      const episodeNumber = selectedEpisodeNumber || firstEpisodeNumber;
-      playerSrc = `${cinemaOsBaseUrl}/${id}/${seasonNum}/${episodeNumber}`;
-    } else {
-      playerSrc = `${cinemaOsBaseUrl}/${id}`;
-    }
-  }
+  const firstEpisodeNumber =
+    (tvEpisodes[0] && tvEpisodes[0].episode_number) || 1;
+  const playerSrc = createCinemaOsPlayerUrl({
+    mediaType,
+    id,
+    season: selectedSeason || 1,
+    episode: selectedEpisodeNumber || firstEpisodeNumber,
+  });
 
   if (loading) {
     return (

@@ -1,6 +1,26 @@
 {
   "rewrites": [
     {
+      "source": "/_next/:path*",
+      "destination": "/api/cinemaos/_next/:path*"
+    },
+    {
+      "source": "/api/cinemaosv2/:path*",
+      "destination": "/api/cinemaos/api/cinemaosv2/:path*"
+    },
+    {
+      "source": "/api/moviebox/:path*",
+      "destination": "/api/cinemaos/api/moviebox/:path*"
+    },
+    {
+      "source": "/api/multi-movies/:path*",
+      "destination": "/api/cinemaos/api/multi-movies/:path*"
+    },
+    {
+      "source": "/api/tmdb/images/:path*",
+      "destination": "/api/cinemaos/api/tmdb/images/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
 import IframePlayerProxy from './IframePlayerProxy';
-
-const cinemaOsBaseUrl = 'https://cinemaos.tech/player';
+import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
 
 function VideoPlayer() {
   const { mediaType, id } = useParams();
@@ -79,16 +78,12 @@ function VideoPlayer() {
 
   // --- Player Source Construction ---
   const playerSrc = useMemo(() => {
-    if (!id) return '';
-
-    if (mediaType === 'tv' || mediaType === 'anime') {
-        if (selectedSeason && selectedEpisodeNumber) {
-            return `${cinemaOsBaseUrl}/${id}/${selectedSeason}/${selectedEpisodeNumber}`;
-        }
-        return '';
-    } else {
-        return `${cinemaOsBaseUrl}/${id}`;
-    }
+    return createCinemaOsPlayerUrl({
+      mediaType,
+      id,
+      season: selectedSeason,
+      episode: selectedEpisodeNumber,
+    });
   }, [mediaType, id, selectedSeason, selectedEpisodeNumber]);
 
   // --- Fullscreen & Orientation ---

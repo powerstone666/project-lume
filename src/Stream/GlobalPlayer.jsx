@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, matchPath } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
+import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
 
-const cinemaOsBaseUrl = 'https://cinemaos.tech/player';
 const MAX_SESSIONS = 1;
 
 function GlobalPlayer() {
@@ -170,15 +170,12 @@ function GlobalPlayer() {
                 episode = urlEpisode ? parseInt(urlEpisode) : (sData.episodes?.[0]?.episode_number || 1);
             }
 
-            // Construct Src
-            let src = '';
-            if (session.mediaType === 'tv' || session.mediaType === 'anime') {
-                 if (season && episode) {
-                     src = `${cinemaOsBaseUrl}/${session.id}/${season}/${episode}`;
-                 }
-            } else {
-                 src = `${cinemaOsBaseUrl}/${session.id}`;
-            }
+            const src = createCinemaOsPlayerUrl({
+                mediaType: session.mediaType,
+                id: session.id,
+                season,
+                episode,
+            });
 
             // Update Session
             setSessions(prev => prev.map(s => {
@@ -212,7 +209,8 @@ function GlobalPlayer() {
   // Listen for cinemaOS PLAYER_EVENT to detect when video is actually playing
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.origin !== 'https://cinemaos.tech') return;
+      const trustedOrigins = [window.location.origin, 'https://cinemaos.tech'];
+      if (!trustedOrigins.includes(event.origin)) return;
       
       const data = event.data;
       if (data?.type === 'PLAYER_EVENT' && data?.data) {
@@ -248,7 +246,12 @@ function GlobalPlayer() {
   const updateSessionEpisode = (epNum) => {
       setSessions(prev => prev.map(s => {
           if (s.id === activeId) {
-             const src = `${cinemaOsBaseUrl}/${s.id}/${s.selectedSeason}/${epNum}`;
+             const src = createCinemaOsPlayerUrl({
+                 mediaType: s.mediaType,
+                 id: s.id,
+                 season: s.selectedSeason,
+                 episode: epNum,
+             });
               return { ...s, selectedEpisodeNumber: epNum, playerSrc: src, playerReady: false };
           }
           return s;
@@ -456,8 +459,12 @@ function GlobalPlayer() {
                         src={session.playerSrc}
                         className="w-full h-full border-0"
                         allow="autoplay *; encrypted-media *; picture-in-picture *"
-                        sandbox="allow-same-origin allow-scripts allow-forms"
-                        data-block-popups="true"
+                        onLoad={() => {
+                            setCinemaOSReady(true);
+                            setSessions(prev => prev.map(s =>
+                                s.id === session.id ? { ...s, playerReady: true } : s
+                            ));
+                        }}
                     />
                 )}
             </div>

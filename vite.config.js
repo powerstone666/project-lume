@@ -6,6 +6,98 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+const CINEMAOS_ORIGIN = 'https://cinemaos.tech'
+const CINEMAOS_INTERNAL_API_PREFIXES = [
+  '/api/cinemaosv2',
+  '/api/moviebox',
+  '/api/multi-movies',
+  '/api/tmdb/images',
+]
+const POPUP_BLOCKER = `
+<script>
+(() => {
+  const blockedOpen = () => null;
+  try {
+    Object.defineProperty(window, 'open', {
+      configurable: false,
+      enumerable: true,
+      writable: false,
+      value: blockedOpen,
+    });
+  } catch {
+    window.open = blockedOpen;
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest?.('a');
+    if (link && link.target && link.target !== '_self') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      link.target = '_self';
+    }
+  }, true);
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (form.target && form.target !== '_self') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      form.target = '_self';
+    }
+  }, true);
+})();
+</script>`
+
+const rewriteCinemaOsUrls = (html) => html
+  .replaceAll(`${CINEMAOS_ORIGIN}/`, '/api/cinemaos/')
+  .replaceAll('//cinemaos.tech/', '/api/cinemaos/')
+  .replace(/(["'(=\s])\/_next\//g, '$1/api/cinemaos/_next/')
+
+const cinemaOsDevProxy = () => ({
+  name: 'cinemaos-dev-proxy',
+  configureServer(server) {
+    server.middlewares.use(async (request, response, next) => {
+      const requestUrl = new URL(request.url || '/', 'http://localhost')
+      const isProxyRequest = requestUrl.pathname.startsWith('/api/cinemaos/')
+      const isNextAssetRequest = requestUrl.pathname.startsWith('/_next/')
+      const isCinemaOsApiRequest = CINEMAOS_INTERNAL_API_PREFIXES.some((prefix) =>
+        requestUrl.pathname === prefix || requestUrl.pathname.startsWith(`${prefix}/`)
+      )
+
+      if (!isProxyRequest && !isNextAssetRequest && !isCinemaOsApiRequest) {
+        return next()
+      }
+
+      try {
+        const upstreamPath = isProxyRequest
+          ? requestUrl.pathname.replace(/^\/api\/cinemaos/, '')
+          : requestUrl.pathname
+        const upstreamUrl = new URL(upstreamPath, CINEMAOS_ORIGIN)
+        upstreamUrl.search = requestUrl.search
+        const upstreamResponse = await fetch(upstreamUrl, {
+          headers: {
+            accept: request.headers.accept || '*/*',
+            ...(request.headers.range ? { range: request.headers.range } : {}),
+            ...(request.headers['user-agent'] ? { 'user-agent': request.headers['user-agent'] } : {}),
+          },
+        })
+        const contentType = upstreamResponse.headers.get('content-type') || 'application/octet-stream'
+        const body = contentType.includes('text/html')
+          ? rewriteCinemaOsUrls(await upstreamResponse.text()).replace('<head>', `<head>${POPUP_BLOCKER}`)
+          : Buffer.from(await upstreamResponse.arrayBuffer())
+
+        response.statusCode = upstreamResponse.status
+        response.setHeader('content-type', contentType)
+        response.end(body)
+      } catch (error) {
+        console.error('CinemaOS dev proxy request failed:', error)
+        response.statusCode = 502
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ error: 'CinemaOS is unavailable' }))
+      }
+    })
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
   resolve: {
@@ -21,6 +113,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    cinemaOsDevProxy(),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
