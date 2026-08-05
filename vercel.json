@@ -1,24 +1,29 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/_next/:path*",
-      "destination": "/api/cinemaos/_next/:path*"
+      "source": "/api/cinemaos/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=:cinemaOsPath*"
     },
     {
-      "source": "/api/cinemaosv2/:path*",
-      "destination": "/api/cinemaos/api/cinemaosv2/:path*"
+      "source": "/_next/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=_next/:cinemaOsPath*"
     },
     {
-      "source": "/api/moviebox/:path*",
-      "destination": "/api/cinemaos/api/moviebox/:path*"
+      "source": "/api/cinemaosv2/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=api/cinemaosv2/:cinemaOsPath*"
     },
     {
-      "source": "/api/multi-movies/:path*",
-      "destination": "/api/cinemaos/api/multi-movies/:path*"
+      "source": "/api/moviebox/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=api/moviebox/:cinemaOsPath*"
     },
     {
-      "source": "/api/tmdb/:path*",
-      "destination": "/api/cinemaos/api/tmdb/:path*"
+      "source": "/api/multi-movies/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=api/multi-movies/:cinemaOsPath*"
+    },
+    {
+      "source": "/api/tmdb/:cinemaOsPath*",
+      "destination": "/api/cinemaos-proxy?upstreamPath=api/tmdb/:cinemaOsPath*"
     },
     {
       "source": "/(.*)",

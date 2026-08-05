@@ -63,8 +63,15 @@ Local development uses the middleware in `vite.config.js`. It intercepts the pla
 
 Production uses:
 
-- `api/cinemaos/[...path].js` as the Vercel catch-all proxy function.
-- `vercel.json` rewrites for CinemaOS root-relative assets and internal APIs.
+- `api/cinemaos-proxy.js` as the stable Vercel proxy function.
+- `vercel.json` rewrites player pages, root-relative assets, and internal APIs to
+  that function before the React SPA fallback is evaluated.
+
+The production rewrites pass the captured CinemaOS path through the
+`upstreamPath` query parameter. This explicit function destination is important
+for Vite deployments: without it, the SPA catch-all can return Lume's
+`index.html` for `/api/cinemaos/...`, causing a second copy of Lume to render
+inside the player iframe.
 
 Both implementations perform the same HTML rewriting and popup-blocker injection.
 

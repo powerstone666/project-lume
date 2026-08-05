@@ -252,20 +252,35 @@ function GlobalPlayer() {
     setCinemaOSReady(false);
   }, [activeId]);
 
-  // --- Helper: Update current session selection ---
-  const updateSessionEpisode = (epNum) => {
+  const selectEpisode = (episodeNumber) => {
+      setCinemaOSReady(false);
       setSessions(prev => prev.map(s => {
           if (s.id === activeId) {
              const src = createCinemaOsPlayerUrl({
                  mediaType: s.mediaType,
                  id: s.id,
                  season: s.selectedSeason,
-                 episode: epNum,
+                 episode: episodeNumber,
              });
-              return { ...s, selectedEpisodeNumber: epNum, playerSrc: src, playerReady: false };
+              return {
+                  ...s,
+                  selectedEpisodeNumber: episodeNumber,
+                  playerSrc: src,
+                  playerReady: false,
+              };
           }
           return s;
       }));
+
+      const nextSearchParams = new URLSearchParams(location.search);
+      const selectedSession = sessions.find(s => s.id === activeId);
+      if (selectedSession?.selectedSeason) {
+          nextSearchParams.set('season', String(selectedSession.selectedSeason));
+      }
+      nextSearchParams.set('episode', String(episodeNumber));
+      navigate({ search: nextSearchParams.toString() }, { replace: true });
+      setShowEpisodeList(false);
+      setControlsVisible(true);
   };
 
   const activeSession = sessions.find(s => s.id === activeId);
@@ -476,7 +491,7 @@ function GlobalPlayer() {
 
   return (
     <div 
-        className={`transition-all duration-300 ${isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`h-[100dvh] transition-all duration-300 ${isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         style={playerStyle}
     >
         
@@ -521,47 +536,87 @@ function GlobalPlayer() {
                  />
 
                  {/* Top Bar */}
-                 <div className={`absolute top-4 left-4 flex gap-3 pointer-events-auto transition-opacity duration-300 ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
-                    <button onClick={closePlayer} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                        ✕ Close
-                     </button>
-                    {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
-                        <button onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">☰ Episodes</button>
-                    )}
-                    {!isFullscreenMode && (
-                        <button onClick={toggleFullscreen} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md hidden md:block">Fullscreen</button>
-                    )}
-                    {/* Mobile Only Buttons */}
-                    <div className="flex md:hidden gap-3">
-                         {!isFullscreenMode && (
-                             <button onClick={toggleFullscreen} className="bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">⛶</button>
-                         )}
+                 <div className={`absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex items-center justify-between gap-2 pointer-events-auto transition-opacity duration-300 md:left-4 md:right-auto md:top-4 md:justify-start ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={closePlayer}
+                            className="min-h-11 rounded-full border border-white/15 bg-black/75 px-4 text-sm font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                        >
+                            ✕ Close
+                        </button>
+                        {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
+                            <button
+                                type="button"
+                                onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }}
+                                className="min-h-11 rounded-full border border-white/15 bg-black/75 px-4 text-sm font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            >
+                                Episodes
+                            </button>
+                        )}
                     </div>
+                    {!isFullscreenMode && (
+                        <button
+                            type="button"
+                            onClick={toggleFullscreen}
+                            aria-label="Enter fullscreen"
+                            className="min-h-11 min-w-11 rounded-full border border-white/15 bg-black/75 px-3 text-lg text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:px-4 md:text-sm md:font-medium"
+                        >
+                            <span className="md:hidden">⛶</span>
+                            <span className="hidden md:inline">Fullscreen</span>
+                        </button>
+                    )}
                  </div>
 
                   {/* Episode List */}
                   {showEpisodeList && (
-                      <div className="absolute top-16 left-4 bottom-4 w-80 bg-black/95 border border-white/10 rounded-xl pointer-events-auto flex flex-col p-4 animate-in slide-in-from-left-5">
-                          <div className="flex justify-between mb-4 text-white font-bold">
-                              <h3>Episodes</h3>
-                              <button onClick={() => setShowEpisodeList(false)}>✕</button>
+                      <>
+                      <button
+                          type="button"
+                          aria-label="Close episode list"
+                          onClick={() => setShowEpisodeList(false)}
+                          className="absolute inset-0 bg-black/55 pointer-events-auto md:hidden"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 max-h-[72dvh] rounded-t-3xl border-t border-white/10 bg-zinc-950 pointer-events-auto flex flex-col p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl md:inset-x-auto md:top-16 md:left-4 md:bottom-4 md:w-96 md:max-h-none md:rounded-2xl md:border">
+                          <div className="mb-3 flex items-center justify-between gap-4 text-white">
+                              <div className="min-w-0">
+                                  <h3 className="text-lg font-semibold">Episodes</h3>
+                                  <p className="truncate text-xs text-zinc-400">Season {activeSession.selectedSeason}</p>
+                              </div>
+                              <button
+                                  type="button"
+                                  aria-label="Close episode list"
+                                  onClick={() => setShowEpisodeList(false)}
+                                  className="min-h-11 min-w-11 rounded-full text-lg text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white"
+                              >
+                                  ✕
+                              </button>
                           </div>
-                          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
+                          <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar space-y-1 pr-1">
                               {activeSession.tvEpisodes.map(ep => (
                                   <button 
                                      key={ep.id}
-                                     onClick={() => {
-                                         updateSessionEpisode(ep.episode_number);
-                                         setShowEpisodeList(false);
-                                     }}
-                                     className={`w-full text-left p-3 rounded hover:bg-white/10 ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-[#9146FF] text-white' : 'text-gray-400'}`}
+                                     type="button"
+                                     onClick={() => selectEpisode(ep.episode_number)}
+                                     className={`min-h-14 w-full rounded-2xl px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-[#9146FF] text-white' : 'text-zinc-300 hover:bg-white/10'}`}
                                   >
-                                      <div className="text-sm font-medium">{ep.episode_number}. {ep.name}</div>
+                                      <div className="flex items-center gap-3">
+                                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-white/20' : 'bg-white/5'}`}>
+                                              {ep.episode_number}
+                                          </span>
+                                          <span className="min-w-0 flex-1">
+                                              <span className="block truncate text-sm font-medium">{ep.name || `Episode ${ep.episode_number}`}</span>
+                                              {ep.runtime ? <span className="block text-xs opacity-65">{ep.runtime} min</span> : null}
+                                          </span>
+                                          {ep.episode_number === activeSession.selectedEpisodeNumber ? <span className="text-xs font-semibold">Playing</span> : null}
+                                      </div>
                                   </button>
                               ))}
                           </div>
                       </div>
+                      </>
                   )}
+
               </div>
          )}
 

@@ -42,17 +42,40 @@ const rewriteCinemaOsUrls = (html) => html
   .replaceAll('//cinemaos.tech/', '/api/cinemaos/')
   .replace(/(["'(=\s])\/_next\//g, '$1/api/cinemaos/_next/');
 
-export default async function handler(request, response) {
-  try {
-    const path = request.query.path;
-    const pathSegments = Array.isArray(path) ? path : [path].filter(Boolean);
-    const upstreamUrl = new URL(`/${pathSegments.join('/')}`, CINEMAOS_ORIGIN);
+const getFirstQueryValue = (value) => Array.isArray(value) ? value[0] : value;
 
-    for (const [key, value] of Object.entries(request.query)) {
-      if (key !== 'path') {
-        upstreamUrl.searchParams.set(key, Array.isArray(value) ? value[0] : value);
-      }
-    }
+const getUpstreamPath = (request) => {
+  const upstreamPath = getFirstQueryValue(request.query.upstreamPath);
+
+  if (typeof upstreamPath !== 'string' || upstreamPath.length === 0) {
+    return null;
+  }
+
+  const normalizedPath = upstreamPath.replace(/^\/+/, '');
+  if (!normalizedPath || normalizedPath.includes('\\')) return null;
+
+  return `/${normalizedPath}`;
+};
+
+const copyUpstreamQuery = (request, upstreamUrl) => {
+  for (const [key, value] of Object.entries(request.query)) {
+    if (key === 'upstreamPath' || key === 'cinemaOsPath') continue;
+
+    const queryValue = getFirstQueryValue(value);
+    if (queryValue !== undefined) upstreamUrl.searchParams.set(key, queryValue);
+  }
+};
+
+export default async function handler(request, response) {
+  const upstreamPath = getUpstreamPath(request);
+
+  if (!upstreamPath) {
+    return response.status(400).json({ error: 'Missing CinemaOS upstream path' });
+  }
+
+  try {
+    const upstreamUrl = new URL(upstreamPath, CINEMAOS_ORIGIN);
+    copyUpstreamQuery(request, upstreamUrl);
 
     const upstreamResponse = await fetch(upstreamUrl, {
       headers: {
