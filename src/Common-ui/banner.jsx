@@ -6,10 +6,15 @@ import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
-import { fetchTrendingMoviesInIndia, fetchTrendingShowsInIndia } from '../Api-services/tmbd';
+import { fetchDiscoverMedia, fetchTrendingMoviesInIndia, fetchTrendingShowsInIndia } from '../Api-services/tmbd';
 import { setTrendingMovies } from '../StateManager/Context';
+import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { Button } from './Button';
 
 const TRENDING_INDIA_KEY = 'trending-in-india';
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function Banner({ category = TRENDING_INDIA_KEY }) {
   const navigate = usePrivateNavigate();
@@ -19,8 +24,35 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [shows, setShows] = useState([]);
+  const [animeItems, setAnimeItems] = useState([]);
+  const [openingSlideKey, setOpeningSlideKey] = useState(null);
+
+  // The anime page has its own featured titles: popular Japanese animation.
+  useEffect(() => {
+    if (category !== 'anime') return;
+    let isMounted = true;
+    setLoading(true);
+    fetchDiscoverMedia({
+      cacheKey: 'banner-anime',
+      mediaType: 'tv',
+      params: { sort_by: 'popularity.desc', with_genres: '16', with_original_language: 'ja', 'vote_count.gte': 100 },
+    })
+      .then((items) => {
+        if (isMounted) setAnimeItems(items.filter((item) => item.backdrop_path).slice(0, 6));
+      })
+      .catch((err) => {
+        if (isMounted) setError(err.message || 'Failed to load banner.');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [category]);
 
   useEffect(() => {
+    if (category === 'anime') return undefined;
     let isMounted = true;
 
     async function loadContent() {
@@ -90,7 +122,9 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
 
   // Filter slides based on category
   let slides = [];
-  if (category === 'trending-movies') {
+  if (category === 'anime') {
+    slides = animeItems.map((item) => ({ ...item, _mediaType: 'tv' }));
+  } else if (category === 'trending-movies') {
     slides = movieSlides;
   } else if (category === 'trending-shows') {
     slides = showSlides;
@@ -99,133 +133,114 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
     slides = [...movieSlides, ...showSlides];
   }
 
+  const openTitle = (item, slideKey) => {
+    // Animation genre (16) + Japanese language ('ja') means anime.
+    const isAnime =
+      (item.genre_ids?.includes(16) || item.genres?.some((g) => g.id === 16)) &&
+      item.original_language === 'ja';
+    const type = isAnime && item._mediaType === 'tv' ? 'anime' : item._mediaType;
+
+    setOpeningSlideKey(slideKey);
+    navigate(`/stream/${type}/${item.id}`);
+  };
+
+  const heroSize = 'h-[70vh] min-h-[28rem] lg:h-[85vh]';
+
   if (loading && slides.length === 0) {
     return (
-      <div className="relative w-full h-[55vh] lg:h-[75vh] overflow-hidden bg-black -mt-14">
-        <div className="absolute inset-0 bg-gradient-to-r from-zinc-900 to-zinc-800 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-600/20 to-transparent animate-shimmer" />
-        </div>
-        <div className="relative h-full flex flex-col justify-end px-4 sm:px-6 md:px-12 pb-10 sm:pb-12 space-y-4">
-          <div className="h-10 sm:h-14 md:h-16 w-48 sm:w-80 md:w-96 bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700 rounded-lg overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-500/30 to-transparent animate-shimmer" />
-          </div>
-          <div className="hidden md:block h-5 w-full max-w-2xl bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700 rounded-md overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-500/30 to-transparent animate-shimmer" />
-          </div>
-          <div className="flex gap-3 mt-4">
-            <div className="h-12 w-32 bg-gradient-to-r from-purple-900/50 to-purple-800/50 rounded-full overflow-hidden relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-600/30 to-transparent animate-shimmer" />
-            </div>
-            <div className="h-12 w-36 bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700 rounded-full overflow-hidden relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-500/30 to-transparent animate-shimmer" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className={`skeleton w-full ${heroSize}`} aria-busy="true" aria-label="Loading featured titles" />
     );
   }
 
   if (error && slides.length === 0) {
     return (
-      <div className="w-full h-[50vh] lg:h-[75vh] flex items-center justify-center text-red-500">
+      <div role="alert" className={`flex w-full items-center justify-center bg-error-container px-6 text-center text-on-error-container ${heroSize}`}>
         {error}
       </div>
     );
   }
 
   if (slides.length === 0) {
-    return <div className="w-full h-[50vh] lg:h-[75vh]" />;
+    return null;
   }
 
   return (
-    <div className="relative w-full h-[55vh] lg:h-[75vh] text-white overflow-hidden ">
+    <section aria-label="Featured titles">
       <Swiper
         modules={[Autoplay, Pagination]}
         slidesPerView={1}
         loop
-        autoplay={{ delay: 5000, disableOnInteraction: false }}
+        autoplay={prefersReducedMotion ? false : { delay: 7000, disableOnInteraction: true, pauseOnMouseEnter: true }}
         pagination={{ clickable: true }}
-        className="h-full banner-swiper"
+        className={`banner-swiper bg-surface-lowest ${heroSize}`}
       >
         {slides.map((item) => {
           const backdropUrl = item.backdrop_path
             ? `https://image.tmdb.org/t/p/original${item.backdrop_path}`
             : item.poster_path
-              ? `https://image.tmdb.org/t/p/original${item.poster_path}`
+              ? `https://image.tmdb.org/t/p/w780${item.poster_path}`
               : null;
 
           const title = item.title || item.name || '';
           const score =
-            typeof item.vote_average === 'number'
-              ? item.vote_average.toFixed(1)
+            typeof item.vote_average === 'number' && item.vote_average > 0
+              ? Math.round(item.vote_average * 10)
               : null;
+          const releaseDate = item.release_date || item.first_air_date;
+          const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
+          const slideKey = `${item._mediaType}-${item.id || title}`;
+          const isOpening = openingSlideKey === slideKey;
 
           return (
-            <SwiperSlide key={`${item._mediaType}-${item.id || title}`}>
-              <div className="relative w-full h-full">
+            <SwiperSlide key={slideKey}>
+              <div className="relative h-full w-full">
                 {backdropUrl && (
-                  <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-                    style={{ backgroundImage: `url(${backdropUrl})` }}
+                  <img
+                    src={backdropUrl}
+                    alt=""
+                    width="1920"
+                    height="1080"
+                    fetchPriority="high"
+                    className="absolute inset-0 h-full w-full object-cover object-top"
                   />
                 )}
 
-                {/* Enhanced gradient overlay with better depth */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                {/* Netflix billboard fades: left for text, bottom into the first row. */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-surface via-surface/60 to-transparent" />
 
-                <div className="relative h-full flex flex-col justify-end md:justify-center px-4 sm:px-6 md:px-12 lg:px-16 pb-12 sm:pb-16 md:pb-20 space-y-3 sm:space-y-4 md:space-y-6">
-                  {/* Enhanced title with gradient */}
-                  <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black mb-2 sm:mb-3 max-w-xs sm:max-w-md md:max-w-2xl lg:max-w-4xl bg-gradient-to-r from-white via-purple-100 to-white bg-clip-text text-transparent drop-shadow-2xl leading-tight">
+                <div className="relative z-10 flex h-full flex-col justify-end gap-4 px-4 pb-24 md:max-w-2xl md:justify-center md:px-12 md:pb-16 lg:max-w-3xl">
+                  <h2 className="text-4xl font-black leading-none text-on-surface drop-shadow-lg md:text-6xl lg:text-7xl">
                     {title}
-                  </h1>
-                  {/* Enhanced overview text */}
-                  <p className="hidden md:block max-w-xl lg:max-w-2xl text-base lg:text-lg text-gray-100 leading-relaxed drop-shadow-lg line-clamp-3">
+                  </h2>
+                  <p className="flex items-center gap-3 text-base font-medium">
+                    {score && <span className="font-bold text-tertiary">{score}% match</span>}
+                    {year && <span className="text-on-surface-variant">{year}</span>}
+                    <span className="text-on-surface-variant">
+                      {item._mediaType === 'tv' ? 'Series' : 'Movie'}
+                    </span>
+                  </p>
+                  <p className="hidden line-clamp-3 text-lg leading-snug text-on-surface drop-shadow-md md:block">
                     {item.overview}
                   </p>
-                  <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-4 overflow-x-auto no-scrollbar">
-                    {score && (
-                      <span className="inline-flex items-center px-2 py-1 md:px-4 md:py-2 rounded-full bg-black/70 backdrop-blur-sm text-xs md:text-base font-bold border border-white/10 shadow-xl shrink-0">
-                        <span className="mr-1 md:mr-2 text-yellow-400 text-sm md:text-lg">★</span>
-                        <span className="text-white">{score}</span>
-                      </span>
-                    )}
-                    {/* Enhanced Play button */}
-                    <button
-                      type="button"
-                      className="group inline-flex items-center px-3 py-1.5 md:px-8 md:py-3.5 rounded-full text-xs md:text-lg font-bold bg-[#9146FF] hover:bg-[#772ce8] transition-all duration-300 shadow-2xl shadow-purple-900/50 cursor-pointer hover:scale-105 hover:shadow-purple-500/50 shrink-0"
-                      onClick={() => {
-                        // Check for Anime: Animation genre (16) + Japanese language ('ja')
-                        const isAnime = 
-                          (item.genre_ids?.includes(16) || item.genres?.some(g => g.id === 16)) && 
-                          item.original_language === 'ja';
-                        
-                        const type = (isAnime && item._mediaType === 'tv') ? 'anime' : item._mediaType;
-                        navigate(`/stream/${type}/${item.id}`);
-                      }}
+                  <div className="mt-1 flex flex-wrap items-center gap-3">
+                    <Button
+                      size="lg"
+                      icon={<PlayArrowRounded fontSize="large" aria-hidden="true" />}
+                      loading={isOpening}
+                      onClick={() => openTitle(item, slideKey)}
                     >
-                      <span className="mr-1.5 md:mr-3 text-base md:text-2xl transition-transform group-hover:scale-110">▶</span>
-                      Play Now
-                    </button>
-                    {/* Enhanced More Info button */}
-                    <button
-                      type="button"
-                      className="group inline-flex items-center px-3 py-1.5 md:px-8 md:py-3.5 rounded-full text-xs md:text-lg font-bold bg-black/50 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 border-2 border-white/40 hover:border-white/60 cursor-pointer hover:scale-105 shadow-xl shrink-0"
-                      onClick={() => {
-                        // Check for Anime: Animation genre (16) + Japanese language ('ja')
-                        const isAnime = 
-                          (item.genre_ids?.includes(16) || item.genres?.some(g => g.id === 16)) && 
-                          item.original_language === 'ja';
-                        
-                        const type = (isAnime && item._mediaType === 'tv') ? 'anime' : item._mediaType;
-                        navigate(`/stream/${type}/${item.id}`);
-                      }}
+                      Play
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="tonal"
+                      icon={<InfoOutlined aria-hidden="true" />}
+                      disabled={isOpening}
+                      onClick={() => openTitle(item, slideKey)}
                     >
-                      <span className="mr-1.5 md:mr-3 inline-flex h-4 w-4 md:h-6 md:w-6 items-center justify-center rounded-full bg-white/30 text-[10px] md:text-sm font-black transition-all group-hover:bg-white/50">
-                        i
-                      </span>
                       More Info
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -233,7 +248,7 @@ function Banner({ category = TRENDING_INDIA_KEY }) {
           );
         })}
       </Swiper>
-    </div>
+    </section>
   );
 }
 

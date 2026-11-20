@@ -7,7 +7,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#9146FF",
-  "background_color": "#000000",
+  "background_color": "#141414",
   "icons": [
     {
       "src": "/icons/lume-icon.png",

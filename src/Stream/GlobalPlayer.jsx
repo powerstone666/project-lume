@@ -1,7 +1,10 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, matchPath } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
-import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
+import { createPlayerUrl } from './playerUrl';
+import CloseRounded from '@mui/icons-material/CloseRounded';
+import FullscreenRounded from '@mui/icons-material/FullscreenRounded';
+import ListRounded from '@mui/icons-material/ListRounded';
 
 const MAX_SESSIONS = 1;
 const POPUP_BLOCKER_FLAG = '__LUME_POPUP_BLOCKER_INSTALLED__';
@@ -212,7 +215,7 @@ function GlobalPlayer() {
                     title: '',
                     loaded: false,
                     lastUsed: Date.now(),
-                    playerSrc: createCinemaOsPlayerUrl({
+                    playerSrc: createPlayerUrl({
                         mediaType,
                         id,
                         season: initialSeason,
@@ -279,7 +282,7 @@ function GlobalPlayer() {
                 episode = urlEpisode ? parseInt(urlEpisode) : (sData.episodes?.[0]?.episode_number || 1);
             }
 
-            const src = createCinemaOsPlayerUrl({
+            const src = createPlayerUrl({
                 mediaType: session.mediaType,
                 id: session.id,
                 season,
@@ -318,7 +321,7 @@ function GlobalPlayer() {
   const selectEpisode = (episodeNumber) => {
       setSessions(prev => prev.map(s => {
           if (s.id === activeId) {
-             const src = createCinemaOsPlayerUrl({
+             const src = createPlayerUrl({
                  mediaType: s.mediaType,
                  id: s.id,
                  season: s.selectedSeason,
@@ -342,6 +345,15 @@ function GlobalPlayer() {
       navigate({ search: nextSearchParams.toString() }, { replace: true });
       setShowEpisodeList(false);
       setControlsVisible(true);
+  };
+
+  // Changing season reloads the session through the URL: the effect above sees the
+  // new season, refetches its episodes and starts at episode 1.
+  const selectSeason = (seasonNumber) => {
+      const nextSearchParams = new URLSearchParams(location.search);
+      nextSearchParams.set('season', String(seasonNumber));
+      nextSearchParams.set('episode', '1');
+      navigate({ search: nextSearchParams.toString() }, { replace: true });
   };
 
   const activeSession = sessions.find(s => s.id === activeId);
@@ -570,22 +582,22 @@ function GlobalPlayer() {
                 style={{ pointerEvents: 'none' }}
              >
                  {/* Top Bar */}
-                 <div className={`absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex items-center justify-between gap-2 transition-opacity duration-300 md:left-4 md:right-auto md:top-4 md:justify-start ${controlsVisible || showEpisodeList ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                 <div className={`absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex items-center justify-between gap-2 transition-opacity duration-300 md:left-4 md:right-auto md:top-4 md:justify-start pointer-events-auto hover:opacity-100 focus-within:opacity-100 ${controlsVisible || showEpisodeList ? 'opacity-100' : 'opacity-60'}`}>
                     <div className="flex min-w-0 items-center gap-2">
                         <button
                             type="button"
                             onClick={closePlayer}
-                            className="min-h-11 rounded-full border border-white/15 bg-black/75 px-4 text-sm font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            className="press inline-flex min-h-11 items-center gap-1.5 rounded-md bg-black/75 px-4 text-sm font-bold text-white hover:bg-black"
                         >
-                            ✕ Close
+                            <CloseRounded fontSize="small" aria-hidden="true" /> Close
                         </button>
                         {(activeSession.mediaType === 'tv' || activeSession.mediaType === 'anime') && (
                             <button
                                 type="button"
                                 onClick={() => { setShowEpisodeList(true); setControlsVisible(true); }}
-                                className="min-h-11 rounded-full border border-white/15 bg-black/75 px-4 text-sm font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                className="press inline-flex min-h-11 items-center gap-1.5 rounded-md bg-black/75 px-4 text-sm font-bold text-white hover:bg-black"
                             >
-                                Episodes
+                                <ListRounded fontSize="small" aria-hidden="true" /> Episodes
                             </button>
                         )}
                     </div>
@@ -594,9 +606,9 @@ function GlobalPlayer() {
                             type="button"
                             onClick={toggleFullscreen}
                             aria-label="Enter fullscreen"
-                            className="min-h-11 min-w-11 rounded-full border border-white/15 bg-black/75 px-3 text-lg text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:px-4 md:text-sm md:font-medium"
+                            className="press inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md bg-black/75 px-3 text-sm font-bold text-white hover:bg-black md:px-4"
                         >
-                            <span className="md:hidden">⛶</span>
+                            <FullscreenRounded fontSize="small" aria-hidden="true" />
                             <span className="hidden md:inline">Fullscreen</span>
                         </button>
                     )}
@@ -611,19 +623,36 @@ function GlobalPlayer() {
                           onClick={() => setShowEpisodeList(false)}
                           className="absolute inset-0 bg-black/55 pointer-events-auto md:hidden"
                       />
-                      <div className="absolute inset-x-0 bottom-0 max-h-[72dvh] rounded-t-3xl border-t border-white/10 bg-zinc-950 pointer-events-auto flex flex-col p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl md:inset-x-auto md:top-16 md:left-4 md:bottom-4 md:w-96 md:max-h-none md:rounded-2xl md:border">
+                      <div className="absolute inset-x-0 bottom-0 max-h-[72dvh] rounded-t-md border-t border-outline-variant bg-surface-container pointer-events-auto flex flex-col p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl md:inset-x-auto md:top-16 md:left-4 md:bottom-4 md:w-96 md:max-h-none md:rounded-md md:border">
                           <div className="mb-3 flex items-center justify-between gap-4 text-white">
                               <div className="min-w-0">
                                   <h3 className="text-lg font-semibold">Episodes</h3>
-                                  <p className="truncate text-xs text-zinc-400">Season {activeSession.selectedSeason}</p>
+                                  {Array.isArray(activeSession.details?.seasons) && activeSession.details.seasons.length > 1 ? (
+                                      <select
+                                          aria-label="Season"
+                                          value={activeSession.selectedSeason ?? ''}
+                                          onChange={(event) => selectSeason(Number(event.target.value))}
+                                          className="mt-1 cursor-pointer rounded-sm border border-outline bg-surface-high px-2 py-1 text-xs font-medium text-on-surface"
+                                      >
+                                          {activeSession.details.seasons
+                                              .filter((season) => season.season_number > 0)
+                                              .map((season) => (
+                                                  <option key={season.id || season.season_number} value={season.season_number}>
+                                                      Season {season.season_number}
+                                                  </option>
+                                              ))}
+                                      </select>
+                                  ) : (
+                                      <p className="truncate text-xs text-on-surface-variant">Season {activeSession.selectedSeason}</p>
+                                  )}
                               </div>
                               <button
                                   type="button"
                                   aria-label="Close episode list"
                                   onClick={() => setShowEpisodeList(false)}
-                                  className="min-h-11 min-w-11 rounded-full text-lg text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white"
+                                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-white/10"
                               >
-                                  ✕
+                                  <CloseRounded />
                               </button>
                           </div>
                           <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar space-y-1 pr-1">
@@ -632,7 +661,7 @@ function GlobalPlayer() {
                                      key={ep.id}
                                      type="button"
                                      onClick={() => selectEpisode(ep.episode_number)}
-                                     className={`min-h-14 w-full rounded-2xl px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-[#9146FF] text-white' : 'text-zinc-300 hover:bg-white/10'}`}
+                                     className={`min-h-14 w-full rounded-md px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-primary text-on-primary' : 'text-on-surface hover:bg-white/10'}`}
                                   >
                                       <div className="flex items-center gap-3">
                                           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${ep.episode_number === activeSession.selectedEpisodeNumber ? 'bg-white/20' : 'bg-white/5'}`}>
@@ -661,9 +690,9 @@ function GlobalPlayer() {
                       onClick={closePlayer}
                       className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full border border-white/10 backdrop-blur-md z-[300]"
                   >
-                      {isWatchPage ? '✕ Exit' : '✕ Close'}
+                      {isWatchPage ? 'Exit' : 'Close'}
                   </button>
-                   <div className="animate-spin h-12 w-12 border-4 border-[#9146FF] border-t-transparent rounded-full mb-4" />
+                   <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mb-4" />
                    <p className="text-white text-lg font-medium mb-2">Loading your movie...</p>
                    <p className="text-gray-400 text-sm text-center max-w-xs mb-4">Initial playback may take a few moments.</p>
                </div>

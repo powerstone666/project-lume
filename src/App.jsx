@@ -10,6 +10,7 @@ const Stream = lazy(() => import('./Stream/stream'));
 const Search = lazy(() => import('./Search/search'));
 const Shows = lazy(() => import('./Shows/shows'));
 const Movies = lazy(() => import('./Movies/movies'));
+const Anime = lazy(() => import('./Anime/anime'));
 const NewPopular = lazy(() => import('./NewPopular/newPopular'));
 import GlobalPlayer from './Stream/GlobalPlayer';
 
@@ -29,14 +30,15 @@ function App() {
       <Analytics />
       <Navbar />
       <Suspense fallback={
-        <div className="min-h-screen bg-black flex items-center justify-center">
-          <div className="text-white text-lg">Loading...</div>
+        <div className="flex min-h-screen items-center justify-center" role="status" aria-label="Loading page">
+          <div className="size-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       }>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/shows" element={<Shows />} />
           <Route path="/movies" element={<Movies />} />
+          <Route path="/anime" element={<Anime />} />
           <Route path="/new" element={<NewPopular />} />
           <Route path="/stream/:mediaType/:id" element={<Stream />} />
           <Route path="/watch/:mediaType/:id" element={null} /> {/* Handled by GlobalPlayer */}

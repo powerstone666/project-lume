@@ -1,428 +1,205 @@
-import React from "react";
-import { useLocation } from "react-router-dom";
-import { usePrivateNavigate } from "../hooks/usePrivateNavigate";
-import Drawer from "@mui/material/Drawer";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import IconButton from "@mui/material/IconButton";
-import Box from "@mui/material/Box";
-import MenuIcon from "@mui/icons-material/Menu";
-import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import HomeIcon from "@mui/icons-material/Home";
-import TvIcon from "@mui/icons-material/LiveTv";
-import MovieIcon from "@mui/icons-material/Movie";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import CastIcon from "@mui/icons-material/Cast";
-import GetAppIcon from "@mui/icons-material/GetApp";
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
+import Home from '@mui/icons-material/Home';
+import HomeOutlined from '@mui/icons-material/HomeOutlined';
+import LiveTv from '@mui/icons-material/LiveTv';
+import LiveTvOutlined from '@mui/icons-material/LiveTvOutlined';
+import Movie from '@mui/icons-material/Movie';
+import MovieOutlined from '@mui/icons-material/MovieOutlined';
+import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
+import LocalFireDepartmentOutlined from '@mui/icons-material/LocalFireDepartmentOutlined';
+import Animation from '@mui/icons-material/Animation';
+import AnimationOutlined from '@mui/icons-material/AnimationOutlined';
+import Search from '@mui/icons-material/Search';
+import SearchOutlined from '@mui/icons-material/SearchOutlined';
+import InstallMobileRounded from '@mui/icons-material/InstallMobileRounded';
+import SearchField from '../Common-ui/SearchField';
+import { IconButton } from '../Common-ui/Button';
 
-function Navbar() {
-  const navigate = usePrivateNavigate();
-  const location = useLocation();
-  const [searchText, setSearchText] = React.useState("");
-  const [isPrompting, setIsPrompting] = React.useState(false);
+const NAV_ITEMS = [
+  { label: 'Home', path: '/', icon: HomeOutlined, activeIcon: Home },
+  { label: 'Shows', path: '/shows', icon: LiveTvOutlined, activeIcon: LiveTv },
+  { label: 'Movies', path: '/movies', icon: MovieOutlined, activeIcon: Movie },
+  { label: 'Anime', path: '/anime', icon: AnimationOutlined, activeIcon: Animation },
+  { label: 'New & Popular', path: '/new', icon: LocalFireDepartmentOutlined, activeIcon: LocalFireDepartment },
+];
 
-  React.useEffect(() => {
-    if (location.pathname.startsWith("/search")) {
-      const params = new URLSearchParams(location.search);
-      const q = params.get("q") || "";
-      setSearchText(q);
-    } else {
-      setSearchText("");
-    }
-  }, [location.pathname, location.search]);
-  
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
-  const [deferredPrompt, setDeferredPrompt] = React.useState(null);
-  const [showInstallButton, setShowInstallButton] = React.useState(false);
-  const [isStandalone, setIsStandalone] = React.useState(false);
-  const [swControlled, setSwControlled] = React.useState(false);
+const MOBILE_NAV_ITEMS = [
+  ...NAV_ITEMS,
+  { label: 'Search', path: '/search', icon: SearchOutlined, activeIcon: Search },
+];
 
+function isActivePath(pathname, path) {
+  return path === '/' ? pathname === '/' : pathname.startsWith(path);
+}
 
-  const toggleMenu = (open) => () => {
-    if (open) setMobileSearchOpen(false);
-    setMobileMenuOpen(open);
-  };
-  const toggleSearch = (open) => () => {
-    if (open) setMobileMenuOpen(false);
-    setMobileSearchOpen(open);
-  };
+/** Install-prompt state for the PWA install action. */
+function useInstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isPrompting, setIsPrompting] = useState(false);
 
-  // Allow escape key to close search.
-  React.useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setMobileSearchOpen(false);
-      }
-    };
-
-    if (mobileSearchOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [mobileSearchOpen]);
-
-  // Track whether the app is already installed to decide if the install CTA should render.
-  React.useEffect(() => {
-    const displayMedia = window.matchMedia("(display-mode: standalone)");
-    const checkStandalone = () => {
+  useEffect(() => {
+    const displayMedia = window.matchMedia('(display-mode: standalone)');
+    const checkStandalone = () =>
       setIsStandalone(displayMedia.matches || window.navigator.standalone === true);
-    };
 
     checkStandalone();
-    displayMedia.addEventListener("change", checkStandalone);
-    return () => displayMedia.removeEventListener("change", checkStandalone);
+    displayMedia.addEventListener('change', checkStandalone);
+    return () => displayMedia.removeEventListener('change', checkStandalone);
   }, []);
 
-  // Track service worker control status.
-  React.useEffect(() => {
-    if (!navigator.serviceWorker) return;
-    const updateControl = () => {
-      const controller = navigator.serviceWorker.controller;
-      setSwControlled(Boolean(controller));
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
     };
-    updateControl();
-    navigator.serviceWorker.addEventListener('controllerchange', updateControl);
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', updateControl);
-  }, []);
-
-  // Listen for PWA install prompt
-  React.useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallButton(true);
-    };
-
-    const handleAppInstalled = () => {
-      setShowInstallButton(false);
-      setDeferredPrompt(null);
-    };
+    const handleAppInstalled = () => setDeferredPrompt(null);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
-  React.useEffect(() => {
-    // If we have SW control and are not installed, make the CTA visible even if the prompt hasn't fired yet.
-    if (!isStandalone && swControlled) {
-      setShowInstallButton(true);
-    }
-  }, [isStandalone, swControlled]);
-
-  const handleInstallClick = async () => {
+  const install = async () => {
     if (!deferredPrompt || isPrompting) return;
-
     setIsPrompting(true);
     try {
       deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setShowInstallButton(false);
-      }
+      await deferredPrompt.userChoice;
     } finally {
       setDeferredPrompt(null);
       setIsPrompting(false);
     }
   };
 
-  const isActivePath = (path) => {
-    if (path === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(path);
-  };
+  return { canInstall: Boolean(deferredPrompt) && !isStandalone, isPrompting, install };
+}
 
-  const navButtonClass = (active) =>
-    `cursor-pointer px-3 py-2 transition-all duration-300 ${
-      active
-        ? "text-white border-b-2 border-[#9146ff]"
-        : "text-gray-300 hover:text-white"
-    }`;
-
-  const drawerItems = [
-    { text: "Home", icon: <HomeIcon />, path: "/" },
-    { text: "Shows", icon: <TvIcon />, path: "/shows" },
-    { text: "Movies", icon: <MovieIcon />, path: "/movies" },
-    { text: "New & popular", icon: <TrendingUpIcon />, path: "/new" },
-  ];
-
+function Brand() {
   return (
-    <nav className="sticky top-0 z-30 bg-black/75 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
-          <div
-            className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => navigate("/")}
-          >
-            <h1 className="text-3xl font-black tracking-wide bg-gradient-to-r from-purple-400 via-[#9146FF] to-purple-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(145,70,255,0.5)] transition-all duration-500 group-hover:drop-shadow-[0_0_30px_rgba(145,70,255,0.7)] group-hover:tracking-wider">
-              Lume
-            </h1>
-          </div>
-
-        {/* Center nav links - Netflix-style */}
-        <div className="hidden items-center gap-3 text-sm font-semibold md:flex">
-          <button
-            type="button"
-            className={navButtonClass(isActivePath("/"))}
-            aria-current="page"
-            onClick={() => navigate("/")}
-          >
-            Home
-          </button>
-          <button
-            type="button"
-            className={navButtonClass(isActivePath("/shows"))}
-            onClick={() => navigate("/shows")}
-          >
-            Shows
-          </button>
-          <button
-            type="button"
-            className={navButtonClass(isActivePath("/movies"))}
-            onClick={() => navigate("/movies")}
-          >
-            Movies
-          </button>
-          <button
-            type="button"
-            className={navButtonClass(isActivePath("/new"))}
-            onClick={() => navigate("/new")}
-          >
-            New &amp; Popular
-          </button>
-        </div>
-
-        {/* Right controls - search & region */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Mobile: show search icon + hamburger */}
-          <div className="flex items-center gap-2 sm:hidden">
-            <button
-              type="button"
-              aria-label="open search"
-              onClick={toggleSearch(true)}
-              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
-            >
-              <SearchIcon />
-            </button>
-            <button
-              type="button"
-              aria-label="open menu"
-              onClick={toggleMenu(true)}
-              className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
-            >
-              <MenuIcon />
-            </button>
-          </div>
-
-          {/* Desktop: full search input */}
-          <div className="relative hidden sm:block">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center" aria-hidden>
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              placeholder="Search movies, shows..."
-              className="w-full max-w-md rounded-full border border-white/20 bg-white/5 backdrop-blur-sm px-4 py-2.5 pl-10 text-sm text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/40 focus:bg-white/10 transition-all cursor-text shadow-lg"
-              value={searchText}
-              onFocus={() => {
-                const params = new URLSearchParams(location.search);
-                if (!params.get("q") && searchText.trim()) {
-                  params.set("q", searchText.trim());
-                }
-                const queryString = params.toString();
-                navigate(`/search${queryString ? `?${queryString}` : ""}`);
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchText(value);
-                const params = new URLSearchParams(location.search);
-                if (value.trim()) {
-                  params.set("q", value);
-                } else {
-                  params.delete("q");
-                }
-                navigate(`/search?${params.toString()}`);
-              }}
-            />
-          </div>
-
-          {/* PWA Install Button */}
-          {!isStandalone && showInstallButton && deferredPrompt && (
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              aria-label="Install app"
-              className="p-2 rounded-xl text-[#9146ff] border border-[#9146ff]/30 hover:text-[#b097ff] hover:border-[#9146ff] transition-all cursor-pointer"
-              title={deferredPrompt ? 'Install Lume' : 'Install from your browser menu'}
-            >
-              <GetAppIcon />
-            </button>
-          )}
-
-          <button
-            type="button"
-            aria-label="cast"
-            className="hidden sm:inline-flex p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
-          >
-            <CastIcon />
-          </button>
-        </div>
-
-        {/* Mobile widgets: Drawer + Dialog */}
-        <Drawer
-          anchor="left"
-          open={mobileMenuOpen}
-          onClose={toggleMenu(false)}
-          PaperProps={{
-            sx: {
-              width: "82vw",
-              maxWidth: "320px",
-              background: "linear-gradient(to bottom right, #000000, #09090b, #000000)",
-              borderRight: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "white",
-            },
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, pt: 3, pb: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <div className="text-lg font-black tracking-tight text-white">
-                Lume
-              </div>
-              <IconButton
-                onClick={toggleMenu(false)}
-                sx={{ color: '#9146ff', '&:hover': { color: '#b097ff', bgcolor: 'rgba(255, 255, 255, 0.1)' } }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            <List sx={{ flex: 1, px: 1.5, py: 2 }}>
-              {drawerItems.map((item) => {
-                const active = isActivePath(item.path);
-                return (
-                  <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-                    <ListItemButton
-                      onClick={() => {
-                        navigate(item.path);
-                        toggleMenu(false)();
-                      }}
-                      sx={{
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'rgba(145, 70, 255, 0.6)' : 'transparent',
-                        bgcolor: active ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                        boxShadow: active ? '0 4px 6px -1px rgba(145, 70, 255, 0.2)' : 'none',
-                        transition: 'all 0.2s',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          borderColor: 'rgba(145, 70, 255, 0.3)',
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ color: '#9146ff', minWidth: 40 }}>
-                        {item.icon}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={item.text}
-                        primaryTypographyProps={{
-                          fontWeight: 600,
-                          fontSize: '1rem',
-                        }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
-            </List>
-          </Box>
-        </Drawer>
-        <MobileSearchDialog open={mobileSearchOpen} onClose={toggleSearch(false)} />
-      </div>
-    </nav>
+    <NavLink
+      to="/"
+      aria-label="Lume home"
+      className="text-3xl font-black uppercase tracking-tight text-primary md:text-4xl"
+    >
+      Lume
+    </NavLink>
   );
 }
 
-// Dialog for mobile search
-function MobileSearchDialog({ open, onClose }) {
-  const navigate = usePrivateNavigate();
-  const location = useLocation();
-  const [value, setValue] = React.useState("");
-
-  const prevPath = React.useRef(location.pathname);
-
-  React.useEffect(() => {
-    if (location.pathname.startsWith("/search")) {
-      const params = new URLSearchParams(location.search);
-      const q = params.get("q") || "";
-      setValue(q);
-    } else if (open && prevPath.current !== location.pathname) {
-      // Only close if we navigated AWAY from a page (path changed)
-      // and the new page is not search.
-      onClose();
-    }
-    prevPath.current = location.pathname;
-  }, [location.pathname, location.search, open, onClose]);
-
-  if (!open) return null;
+function DesktopLink({ item, pathname }) {
+  const active = isActivePath(pathname, item.path);
 
   return (
-    <div className="fixed inset-x-0 top-16 z-20 bg-black/95 backdrop-blur-xl border-b border-white/10 shadow-2xl animate-in slide-in-from-top duration-300">
-      <div className="p-4 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setValue("");
-              navigate(location.pathname);
-              onClose();
-            }}
-            className="p-2 rounded-lg text-[#9146ff] hover:text-[#b097ff] hover:bg-white/5 transition-all cursor-pointer"
-            aria-label="back"
-          >
-            <ArrowBackIcon />
-          </button>
-          <div className="relative flex-1">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search movies, shows..."
-              value={value}
-              onChange={(e) => {
-                const next = e.target.value;
-                setValue(next);
-                const params = new URLSearchParams();
-                if (next.trim()) {
-                  params.set("q", next);
-                }
-                navigate(`/search?${params.toString()}`);
-              }}
-              className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2.5 pr-12 text-white outline-none placeholder:text-gray-400 focus:border-[#9146ff] focus:ring-2 focus:ring-[#9146ff]/30 transition-all"
-            />
-            <button
-              type="button"
-              onClick={() => setValue("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
-              style={{ color: value ? '#9146ff' : '#6b7280' }}
-              aria-label="clear"
-            >
-              <CloseIcon />
-            </button>
+    <NavLink
+      to={item.path}
+      aria-current={active ? 'page' : undefined}
+      className={`text-sm transition-colors ${
+        active ? 'font-bold text-on-surface' : 'text-on-surface/80 hover:text-on-surface/60'
+      }`}
+    >
+      {item.label}
+    </NavLink>
+  );
+}
+
+function MobileTab({ item, pathname }) {
+  const active = isActivePath(pathname, item.path);
+  const Icon = active ? item.activeIcon : item.icon;
+
+  return (
+    <NavLink
+      to={item.path}
+      aria-current={active ? 'page' : undefined}
+      className={`press flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${
+        active ? 'font-bold text-on-surface' : 'text-on-surface-variant'
+      }`}
+    >
+      <Icon fontSize="small" aria-hidden="true" />
+      {item.label === 'New & Popular' ? 'New' : item.label}
+    </NavLink>
+  );
+}
+
+function Navbar() {
+  const navigate = usePrivateNavigate();
+  const location = useLocation();
+  const { canInstall, isPrompting, install } = useInstallPrompt();
+  const [scrolled, setScrolled] = useState(() => window.scrollY > 10);
+
+  // Transparent over the billboard, solid once the page scrolls.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // The URL is the single source of truth for the query.
+  const searchText = location.pathname.startsWith('/search')
+    ? new URLSearchParams(location.search).get('q') || ''
+    : '';
+
+  const updateSearch = (value) => {
+    const params = new URLSearchParams(location.search);
+    if (value.trim()) params.set('q', value);
+    else params.delete('q');
+    // Typing on the results page replaces the entry so Back leaves search in one step.
+    navigate(`/search?${params.toString()}`, { replace: location.pathname.startsWith('/search') });
+  };
+
+  return (
+    <>
+      <header
+        className={`fixed inset-x-0 top-0 z-30 transition-colors duration-300 ${
+          scrolled ? 'bg-surface' : 'bg-gradient-to-b from-black/80 to-transparent'
+        }`}
+      >
+        <nav
+          aria-label="Primary"
+          className="flex h-16 items-center gap-8 px-4 md:h-[4.5rem] md:px-12"
+        >
+          <Brand />
+
+          <div className="hidden items-center gap-5 md:flex">
+            {NAV_ITEMS.map((item) => (
+              <DesktopLink key={item.path} item={item} pathname={location.pathname} />
+            ))}
           </div>
-        </div>
-      </div>
-    </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <SearchField
+              value={searchText}
+              onChange={updateSearch}
+              onFocus={() => {
+                if (!location.pathname.startsWith('/search')) navigate('/search');
+              }}
+              onClear={() => updateSearch('')}
+              className="hidden w-64 md:block lg:w-80"
+            />
+            {canInstall && (
+              <IconButton label="Install Lume app" onClick={install} loading={isPrompting}>
+                <InstallMobileRounded fontSize="small" />
+              </IconButton>
+            )}
+          </div>
+        </nav>
+      </header>
+
+      {/* Compact screens: bottom tab bar replaces a menu drawer. */}
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-outline-variant bg-surface-lowest pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
+        {MOBILE_NAV_ITEMS.map((item) => (
+          <MobileTab key={item.path} item={item} pathname={location.pathname} />
+        ))}
+      </nav>
+    </>
   );
 }
 

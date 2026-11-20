@@ -7,7 +7,10 @@ import {
   fetchSeasonDetails,
   fetchSimilar,
 } from '../Api-services/tmbd';
-import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
+import { createPlayerUrl } from './playerUrl';
+import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
+import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded';
+import { Button, IconButton } from '../Common-ui/Button';
 
 function Stream() {
   const { mediaType = 'movie', id } = useParams();
@@ -150,6 +153,8 @@ function Stream() {
     };
   }, [mediaType, id, selectedSeason, seasonEpisodes]);
 
+  const isSeries = mediaType === 'tv' || mediaType === 'anime';
+
   const title =
     details?.title || details?.name || details?.original_title || 'Unknown';
 
@@ -162,11 +167,6 @@ function Stream() {
   const year =
     details?.release_date || details?.first_air_date
       ? new Date(details.release_date || details.first_air_date).getFullYear()
-      : null;
-
-  const score =
-    typeof details?.vote_average === 'number'
-      ? details.vote_average.toFixed(1)
       : null;
 
   const genresLabel = Array.isArray(details?.genres)
@@ -232,21 +232,26 @@ function Stream() {
 
   const firstEpisodeNumber =
     (tvEpisodes[0] && tvEpisodes[0].episode_number) || 1;
-  const playerSrc = createCinemaOsPlayerUrl({
+  const playerSrc = createPlayerUrl({
     mediaType,
     id,
     season: selectedSeason || 1,
     episode: selectedEpisodeNumber || firstEpisodeNumber,
   });
 
+  const matchScore =
+    typeof details?.vote_average === 'number' && details.vote_average > 0
+      ? Math.round(details.vote_average * 10)
+      : null;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white">
-        <div className="relative w-full h-[60vh] bg-zinc-900 animate-pulse" />
-        <div className="px-6 py-6 space-y-3">
-          <div className="h-7 w-40 bg-zinc-800 rounded-md" />
-          <div className="h-4 w-64 bg-zinc-800 rounded-md" />
-          <div className="h-4 w-56 bg-zinc-800 rounded-md" />
+      <div className="min-h-screen" aria-busy="true" aria-label="Loading title">
+        <div className="skeleton h-[60vh] w-full" />
+        <div className="space-y-3 px-4 py-6 md:px-12">
+          <div className="skeleton h-7 w-48 rounded-sm" />
+          <div className="skeleton h-4 w-72 rounded-sm" />
+          <div className="skeleton h-4 w-64 rounded-sm" />
         </div>
       </div>
     );
@@ -254,28 +259,65 @@ function Stream() {
 
   if (error || !details) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4">
-        <p className="mb-4 text-red-400 text-sm">{error || 'Not found.'}</p>
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="px-4 py-2 rounded-full bg-[#9146FF] hover:bg-[#772ce8] text-sm font-semibold"
-        >
-          ← Go back
-        </button>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
+        <p role="alert" className="text-on-surface-variant">{error || 'Not found.'}</p>
+        <Button onClick={() => navigate('/')} icon={<ArrowBackRounded aria-hidden="true" />}>
+          Go home
+        </Button>
       </div>
     );
   }
 
+  const posterGrid = (basePath) => (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:gap-3 lg:grid-cols-5 xl:grid-cols-6">
+      {recommended.slice(0, 18).map((item) => {
+        const img = item.poster_path
+          ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
+          : item.backdrop_path
+            ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
+            : null;
+        const recTitle = item.title || item.name || item.original_title || 'Untitled';
+
+        return (
+          <button
+            type="button"
+            key={item.id}
+            className="group text-left"
+            onClick={() => navigate(`${basePath}/${item.id}`)}
+          >
+            <span className="block aspect-[2/3] w-full overflow-hidden rounded-sm bg-surface-container transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105">
+              {img ? (
+                <img
+                  src={img}
+                  alt=""
+                  width="342"
+                  height="513"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-on-surface-variant">
+                  {recTitle}
+                </span>
+              )}
+            </span>
+            <span className="mt-2 block truncate text-sm font-medium">{recTitle}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="relative w-screen h-[50vh] md:h-[60vh] lg:h-[70vh] overflow-hidden left-1/2 -translate-x-1/2">
+    <div className="min-h-screen">
+      <div className="relative left-1/2 h-[55vh] w-screen -translate-x-1/2 overflow-hidden md:h-[65vh] lg:h-[75vh]">
         {isPlaying ? (
-          <div id="video-slot" className="absolute inset-0 bg-black z-20" />
+          <div id="video-slot" className="absolute inset-0 z-20 bg-black" />
         ) : trailerKey ? (
           <div className="absolute inset-0 overflow-hidden">
             <iframe
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
               style={{
                 width: '100vw',
                 height: '56.25vw', // 16:9 aspect ratio
@@ -291,64 +333,55 @@ function Stream() {
           </div>
         ) : (
           backdropUrl && (
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${backdropUrl})` }}
-            />
+            <img src={backdropUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
           )
         )}
 
         {!isPlaying && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
+          <>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-surface via-surface/70 to-transparent" />
+          </>
         )}
 
         {!isPlaying && (
-          <button
-            type="button"
+          <IconButton
+            label="Go back"
+            variant="tonal"
             onClick={() => navigate('/')}
-            className="absolute left-3 top-3 md:left-4 md:top-4 z-20 rounded-full bg-black/90 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm hover:bg-black cursor-pointer border border-white/20 shadow-lg active:scale-95 transition-transform"
-            aria-label="Go back"
+            className="absolute left-4 top-20 z-20 md:left-12 md:top-24"
           >
-            ← <span className="hidden sm:inline">Back</span>
-          </button>
+            <ArrowBackRounded />
+          </IconButton>
         )}
 
         {!isPlaying ? (
-          <div className="relative z-10 flex h-full flex-col justify-end px-4 pb-6 sm:px-6 sm:pb-8 md:px-12 md:pb-12 space-y-2 sm:space-y-3 md:space-y-4 max-w-5xl">
-            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-7xl font-black bg-gradient-to-r from-white via-purple-100 to-white bg-clip-text text-transparent drop-shadow-2xl leading-tight">
+          <div className="relative z-10 flex h-full max-w-3xl flex-col justify-end gap-4 px-4 pb-8 md:px-12 md:pb-14">
+            <h1 className="text-4xl font-black leading-none drop-shadow-lg md:text-6xl lg:text-7xl">
               {title}
             </h1>
-            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm md:text-base text-gray-300">
-              {year && <span className="px-2.5 py-1 md:px-3 md:py-1 rounded-full bg-white/10 backdrop-blur-sm">{year}</span>}
-              {runtime && (
-                <span className="px-2.5 py-1 md:px-3 md:py-1 rounded-full bg-white/10 backdrop-blur-sm">
-                  {runtime}
-                  min
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base font-medium">
+              {matchScore && <span className="font-bold text-tertiary">{matchScore}% match</span>}
+              {year && <span className="text-on-surface-variant">{year}</span>}
+              {ageRating && (
+                <span className="rounded-sm border border-outline px-1.5 text-sm text-on-surface-variant">
+                  {ageRating}
                 </span>
               )}
-              {(mediaType === 'tv' || mediaType === 'anime') && <span className="px-2.5 py-1 md:px-3 md:py-1 rounded-full bg-white/10 backdrop-blur-sm">Series</span>}
-            </div>
-            <p className="max-w-3xl text-sm sm:text-base md:text-lg text-gray-100 leading-relaxed drop-shadow-lg line-clamp-3 md:line-clamp-none">
+              {runtime ? <span className="text-on-surface-variant">{runtime} min</span> : null}
+              {seasonsLabel && <span className="text-on-surface-variant">{seasonsLabel}</span>}
+            </p>
+            <p className="line-clamp-3 max-w-2xl text-base leading-snug md:line-clamp-none md:text-lg">
               {details.overview}
             </p>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 sm:mt-3 md:mt-4">
-              <button
-                type="button"
-                className="group inline-flex items-center px-5 py-2 sm:px-6 sm:py-2.5 md:px-8 md:py-3.5 rounded-full text-sm sm:text-base md:text-lg font-bold bg-[#9146FF] hover:bg-[#772ce8] transition-all duration-300 shadow-2xl shadow-purple-900/50 cursor-pointer active:scale-95 md:hover:scale-105"
-                onClick={() => {
-                  setSearchParams({ play: '1' });
-                }}
+            <div className="mt-1 flex items-center gap-3">
+              <Button
+                size="lg"
+                icon={<PlayArrowRounded fontSize="large" aria-hidden="true" />}
+                onClick={() => setSearchParams({ play: '1' })}
               >
-                <span className="mr-2 md:mr-3 text-xl md:text-2xl transition-transform group-hover:scale-110">▶</span>
-                <span className="hidden sm:inline">Play Now</span>
-                <span className="sm:hidden">Play</span>
-              </button>
-              {score && (
-                <span className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-black/70 backdrop-blur-sm text-sm sm:text-base font-bold border border-white/10 shadow-xl">
-                  <span className="mr-1.5 sm:mr-2 text-yellow-400 text-base sm:text-lg">★</span>
-                  <span className="text-white">{score}</span>
-                </span>
-              )}
+                Play
+              </Button>
             </div>
           </div>
         ) : (
@@ -356,277 +389,155 @@ function Stream() {
         )}
       </div>
 
-      {cast.length > 0 && (
-        <section className="px-4 md:px-8 pt-4 pb-8 space-y-4">
-          {(genresLabel || ageRating || seasonsLabel) && (
-            <>
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-300 mb-2">
-                {genresLabel && (
-                  <span className="inline-flex items-center px-4 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-xs md:text-sm">
-                    {genresLabel}
-                  </span>
-                )}
-                {ageRating && (
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-[#9146ff]/30 bg-[#9146ff]/10 backdrop-blur-sm text-xs md:text-sm text-purple-200 font-semibold">
-                    {ageRating}
-                  </span>
-                )}
-                {seasonsLabel && (
-                  <span className="inline-flex items-center px-4 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-xs md:text-sm">
-                    {seasonsLabel}
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] md:text-[11px] text-gray-500 mb-4 max-w-full md:max-w-2xl bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
-                Note: Audio language may vary by cloud server selected. If no official Hindi server
-                is available, try switching to the Flix server.
+      {(genresLabel || cast.length > 0) && (
+        <section className="grid gap-6 px-4 py-8 text-sm md:grid-cols-[1fr_auto] md:px-12">
+          <div className="space-y-2">
+            {cast.length > 0 && (
+              <p>
+                <span className="text-on-surface-variant">Cast: </span>
+                {cast.map((person) => person.name).join(', ')}
               </p>
-            </>
-          )}
-          <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Cast</h2>
-          <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
-            {cast.map((person) => (
-              <div
-                key={person.id}
-                className="flex-shrink-0 w-28 md:w-36 bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-xl overflow-hidden border border-white/5 hover:border-[#9146ff]/30 hover:scale-105 transition-all duration-300 shadow-lg"
-              >
-                {person.profile_path ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w185${person.profile_path}`}
-                    alt={person.name}
-                    className="h-32 md:h-40 w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-32 md:h-40 w-full flex items-center justify-center text-xs text-gray-400 bg-zinc-800">
-                    {person.name}
-                  </div>
-                )}
-                <div className="px-3 py-2">
-                  <p className="text-xs md:text-sm font-semibold truncate text-white">
-                    {person.name}
-                  </p>
-                  {person.character && (
-                    <p className="text-[10px] md:text-xs text-gray-400 truncate">
-                      as
-                      {' '}
-                      {person.character}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+            )}
+            {genresLabel && (
+              <p>
+                <span className="text-on-surface-variant">Genres: </span>
+                {genresLabel}
+              </p>
+            )}
           </div>
+          <p className="max-w-sm text-xs text-on-surface-variant">
+            Audio language may vary by server. If an official Hindi server is not available, try
+            switching to the Flix server.
+          </p>
         </section>
       )}
 
-      {/* Full-screen player overlay - Mobile optimized */}
+      {/* Movie: More like this */}
+      {!isSeries && recommended.length > 0 && (
+        <section className="space-y-3 px-4 pb-6 md:px-12 md:pb-8">
+          <h2 className="text-xl font-bold">More Like This</h2>
+          {posterGrid(`/stream/${mediaType}`)}
+        </section>
+      )}
 
-
-      {/* Movie: More like this (poster grid) */}
-      {mediaType !== 'tv' && recommended.length > 0 && (
-        <section className="px-4 md:px-8 pb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            More Like This
-          </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-            {recommended.slice(0, 18).map((item) => {
-              const img = item.poster_path
-                ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
-                : item.backdrop_path
-                  ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
-                  : null;
-              const recTitle =
-                item.title || item.name || item.original_title || 'Untitled';
-
-              return (
+      {/* TV: Episodes / More like this */}
+      {isSeries && (
+        <section className="space-y-4 px-4 pb-6 md:px-12 md:pb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant">
+            <div role="tablist" aria-label="Series sections" className="flex gap-6">
+              {[
+                { id: 'episodes', label: 'Episodes' },
+                { id: 'similar', label: 'More Like This' },
+              ].map((tab) => (
                 <button
+                  key={tab.id}
                   type="button"
-                  key={item.id}
-                  className="group bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-lg overflow-hidden text-left hover:scale-105 hover:z-10 transition-all duration-300 cursor-pointer border border-white/5 hover:border-[#9146ff]/30 shadow-lg"
-                  onClick={() => navigate(`/stream/${mediaType}/${item.id}`)}
+                  role="tab"
+                  aria-selected={activeTvTab === tab.id}
+                  onClick={() => setActiveTvTab(tab.id)}
+                  className={`-mb-px border-b-4 py-3 text-base font-bold transition-colors ${
+                    activeTvTab === tab.id
+                      ? 'border-primary text-on-surface'
+                      : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                  }`}
                 >
-                  {img ? (
-                    <img
-                      src={img}
-                      alt={recTitle}
-                      className="w-full aspect-[2/3] object-cover"
-                    />
-                  ) : (
-                    <div className="w-full aspect-[2/3] flex items-center justify-center text-xs text-gray-300 px-2 text-center bg-zinc-800">
-                      {recTitle}
-                    </div>
-                  )}
-                  <div className="px-2 py-2">
-                    <p className="text-xs md:text-sm font-semibold truncate text-white">
-                      {recTitle}
-                    </p>
-                  </div>
+                  {tab.label}
                 </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* TV: Episodes / Similar */}
-      {mediaType === 'tv' && (
-        <section className="px-4 md:px-8 pb-10 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3 md:gap-4">
-            <div className="flex w-full md:w-auto md:min-w-[260px] text-sm md:text-base rounded-full border border-gray-700 bg-black/40 overflow-hidden">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 md:py-2 text-center ${
-                  activeTvTab === 'episodes'
-                    ? 'bg-[#9146FF] text-white'
-                    : 'bg-transparent text-gray-400'
-                }`}
-                onClick={() => setActiveTvTab('episodes')}
-              >
-                Episodes
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 md:py-2 text-center ${
-                  activeTvTab === 'similar'
-                    ? 'bg-[#9146FF] text-white'
-                    : 'bg-transparent text-gray-400'
-                }`}
-                onClick={() => setActiveTvTab('similar')}
-              >
-                Similar
-              </button>
+              ))}
             </div>
 
             {activeTvTab === 'episodes' &&
               Array.isArray(details.seasons) &&
               details.seasons.length > 0 && (
                 <select
+                  aria-label="Season"
                   value={selectedSeason ?? ''}
                   onChange={(e) => {
                     setSelectedSeason(Number(e.target.value));
                     setSelectedEpisodeNumber(null);
                   }}
-                  className="ml-4 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs md:text-sm"
+                  className="cursor-pointer rounded-sm border border-outline bg-surface-container px-3 py-2 text-sm font-medium text-on-surface"
                 >
                   {details.seasons
                     .filter((s) => s.season_number > 0)
                     .map((s) => (
-                      <option
-                        key={s.id || s.season_number}
-                        value={s.season_number}
-                      >
-                        Season
-                        {' '}
-                        {s.season_number}
+                      <option key={s.id || s.season_number} value={s.season_number}>
+                        Season {s.season_number}
                       </option>
                     ))}
                 </select>
-            )}
+              )}
           </div>
 
           {activeTvTab === 'episodes' ? (
-            <div className="space-y-3">
+            <ol className="divide-y divide-outline-variant">
               {tvEpisodes.map((ep) => {
                 const still = ep.still_path
                   ? `https://image.tmdb.org/t/p/w300${ep.still_path}`
                   : null;
-                const isSelected =
-                  selectedEpisodeNumber === ep.episode_number;
+                const isSelected = selectedEpisodeNumber === ep.episode_number;
 
                 return (
-                  <div
-                    key={ep.id}
-                    className={`group flex gap-3 rounded-lg p-2 md:p-3 cursor-pointer transition-colors ${
-                      isSelected ? 'bg-zinc-800' : 'bg-zinc-900/60 hover:bg-zinc-800/80'
-                    }`}
-                    onClick={() => {
-                      setSelectedEpisodeNumber(ep.episode_number);
-                      setSearchParams({ play: '1', season: selectedSeason.toString(), episode: ep.episode_number.toString() });
-                    }}
-                  >
-                    {still && (
-                      <div className="relative h-20 w-32 rounded-md overflow-hidden">
-                        <img
-                          src={still}
-                          alt={ep.name}
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#9146FF] text-white text-xs font-bold">
-                            ▶
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between text-xs md:text-sm text-gray-200">
-                        <span className="font-semibold">
-                          {ep.episode_number}
-                          .&nbsp;
-                          {ep.name}
+                  <li key={ep.id}>
+                    <button
+                      type="button"
+                      aria-label={`Play episode ${ep.episode_number}, ${ep.name}`}
+                      className={`group flex w-full items-center gap-4 rounded-sm px-2 py-4 text-left transition-colors md:gap-6 md:px-4 ${
+                        isSelected ? 'bg-surface-high' : 'hover:bg-surface-container'
+                      }`}
+                      onClick={() => {
+                        setSelectedEpisodeNumber(ep.episode_number);
+                        setSearchParams({
+                          play: '1',
+                          season: selectedSeason.toString(),
+                          episode: ep.episode_number.toString(),
+                        });
+                      }}
+                    >
+                      <span className="w-6 shrink-0 text-center text-xl text-on-surface-variant md:w-10 md:text-2xl">
+                        {ep.episode_number}
+                      </span>
+                      <span className="relative block aspect-video w-28 shrink-0 overflow-hidden rounded-sm bg-surface-container md:w-44">
+                        {still && (
+                          <img
+                            src={still}
+                            alt=""
+                            width="300"
+                            height="169"
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                          <PlayArrowRounded />
                         </span>
-                        {ep.runtime && (
-                          <span className="text-gray-400">
-                            {ep.runtime}
-                            min
+                      </span>
+                      <span className="min-w-0 flex-1 space-y-1">
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className="truncate text-sm font-bold md:text-base">{ep.name}</span>
+                          {ep.runtime ? (
+                            <span className="shrink-0 text-sm text-on-surface-variant">{ep.runtime}m</span>
+                          ) : null}
+                        </span>
+                        {ep.overview && (
+                          <span className="line-clamp-2 block text-xs text-on-surface-variant md:text-sm">
+                            {ep.overview}
                           </span>
                         )}
-                      </div>
-                      {ep.overview && (
-                        <p className="text-[11px] md:text-xs text-gray-300 line-clamp-2">
-                          {ep.overview}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                      </span>
+                    </button>
+                  </li>
                 );
               })}
               {tvEpisodes.length === 0 && (
-                <p className="text-xs text-gray-400">
+                <li className="py-6 text-sm text-on-surface-variant">
                   No episode information available for this season.
-                </p>
+                </li>
               )}
-            </div>
+            </ol>
           ) : (
-            recommended.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-                {recommended.slice(0, 18).map((item) => {
-                  const img = item.poster_path
-                    ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
-                    : item.backdrop_path
-                      ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
-                      : null;
-                  const recTitle =
-                    item.title || item.name || item.original_title || 'Untitled';
-
-                  return (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className="bg-zinc-900 rounded-lg overflow-hidden text-left hover:scale-[1.02] hover:z-10 transition-transform cursor-pointer"
-                      onClick={() => navigate(`/stream/tv/${item.id}`)}
-                    >
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={recTitle}
-                          className="w-full aspect-[2/3] object-cover"
-                        />
-                      ) : (
-                        <div className="w-full aspect-[2/3] flex items-center justify-center text-xs text-gray-300 px-2 text-center">
-                          {recTitle}
-                        </div>
-                      )}
-                      <div className="px-2 py-1">
-                        <p className="text-[11px] md:text-xs font-semibold truncate">
-                          {recTitle}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )
+            recommended.length > 0 && posterGrid(`/stream/${mediaType}`)
           )}
         </section>
       )}

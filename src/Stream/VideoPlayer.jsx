@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMediaDetails, fetchSeasonDetails } from '../Api-services/tmbd';
 import IframePlayerProxy from './IframePlayerProxy';
-import { createCinemaOsPlayerUrl } from './cinemaOsUrl';
+import { createPlayerUrl } from './playerUrl';
 
 function VideoPlayer() {
   const { mediaType, id } = useParams();
@@ -78,7 +78,7 @@ function VideoPlayer() {
 
   // --- Player Source Construction ---
   const playerSrc = useMemo(() => {
-    return createCinemaOsPlayerUrl({
+    return createPlayerUrl({
       mediaType,
       id,
       season: selectedSeason,

@@ -1,10 +1,106 @@
 @import "tailwindcss";
+@import "@fontsource-variable/roboto-flex";
+
+/*
+ * Lume design tokens: Netflix-style, dark only, purple accent on near-black.
+ * Every colour is a role token. Components use the Tailwind utilities generated
+ * below (bg-surface, text-on-surface, bg-primary, ...), never raw hex.
+ */
+:root {
+  color-scheme: dark;
+  --md-primary: #9146ff;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #772ce8;
+  --md-on-primary-container: #ffffff;
+  --md-secondary: #ffffff;
+  --md-on-secondary: #141414;
+  --md-secondary-container: rgb(109 109 110 / 0.7);
+  --md-on-secondary-container: #ffffff;
+  --md-tertiary: #46d369;
+  --md-on-tertiary: #00210a;
+  --md-tertiary-container: #1e5a2e;
+  --md-on-tertiary-container: #b9f5c6;
+  --md-error: #ff6b6b;
+  --md-on-error: #1f0000;
+  --md-error-container: #5c1414;
+  --md-on-error-container: #ffdad6;
+  --md-background: #141414;
+  --md-on-background: #ffffff;
+  --md-surface: #141414;
+  --md-on-surface: #ffffff;
+  --md-on-surface-variant: #b3b3b3;
+  --md-surface-container-lowest: #000000;
+  --md-surface-container-low: #181818;
+  --md-surface-container: #1f1f1f;
+  --md-surface-container-high: #2a2a2a;
+  --md-surface-container-highest: #333333;
+  --md-outline: #808080;
+  --md-outline-variant: #404040;
+  --md-inverse-surface: #ffffff;
+  --md-inverse-on-surface: #141414;
+  --md-inverse-primary: #9146ff;
+  --md-scrim: #000000;
+}
+
+@theme inline {
+  --color-primary: var(--md-primary);
+  --color-on-primary: var(--md-on-primary);
+  --color-primary-container: var(--md-primary-container);
+  --color-on-primary-container: var(--md-on-primary-container);
+  --color-secondary: var(--md-secondary);
+  --color-on-secondary: var(--md-on-secondary);
+  --color-secondary-container: var(--md-secondary-container);
+  --color-on-secondary-container: var(--md-on-secondary-container);
+  --color-tertiary: var(--md-tertiary);
+  --color-on-tertiary: var(--md-on-tertiary);
+  --color-tertiary-container: var(--md-tertiary-container);
+  --color-on-tertiary-container: var(--md-on-tertiary-container);
+  --color-error: var(--md-error);
+  --color-on-error: var(--md-on-error);
+  --color-error-container: var(--md-error-container);
+  --color-on-error-container: var(--md-on-error-container);
+  --color-background: var(--md-background);
+  --color-on-background: var(--md-on-background);
+  --color-surface: var(--md-surface);
+  --color-on-surface: var(--md-on-surface);
+  --color-on-surface-variant: var(--md-on-surface-variant);
+  --color-surface-lowest: var(--md-surface-container-lowest);
+  --color-surface-low: var(--md-surface-container-low);
+  --color-surface-container: var(--md-surface-container);
+  --color-surface-high: var(--md-surface-container-high);
+  --color-surface-highest: var(--md-surface-container-highest);
+  --color-outline: var(--md-outline);
+  --color-outline-variant: var(--md-outline-variant);
+  --color-inverse-surface: var(--md-inverse-surface);
+  --color-inverse-on-surface: var(--md-inverse-on-surface);
+  --color-inverse-primary: var(--md-inverse-primary);
+  --color-scrim: var(--md-scrim);
+
+  --font-sans: "Roboto Flex Variable", ui-sans-serif, system-ui, sans-serif;
+
+}
 
 html,
 body {
-  background-color: black;
+  background-color: var(--md-background);
+  color: var(--md-on-surface);
+  font-family: var(--font-sans);
   overflow-x: hidden;
   min-height: 100%;
+}
+
+/* Tailwind v4 resets buttons to the default cursor. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -16,50 +112,69 @@ body {
   scrollbar-width: none;
 }
 
+/* Billboard pagination: bars at the bottom right, purple for the current one. */
+.banner-swiper .swiper-pagination {
+  bottom: 6.5rem;
+  text-align: right;
+  padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+  .banner-swiper .swiper-pagination {
+    bottom: 7rem;
+    padding-right: 3rem;
+  }
+}
+
 .banner-swiper .swiper-pagination-bullet {
-  background-color: rgba(145, 70, 255, 0.4);
-  opacity: 1;
+  width: 1.25rem;
+  height: 0.25rem;
+  border-radius: 2px;
+  background-color: #fff;
+  opacity: 0.4;
 }
 
 .banner-swiper .swiper-pagination-bullet-active {
-  background-color: #9146ff;
+  background-color: var(--md-primary);
   opacity: 1;
 }
 
-.banner-swiper .swiper-button-prev,
-.banner-swiper .swiper-button-next {
-  color: #9146ff;
-}
-
-@media (max-width: 768px) {
-  .banner-swiper .swiper-button-prev,
-  .banner-swiper .swiper-button-next {
-    display: none;
-  }
+/* Row carousels: Netflix-style full-height edge arrows, desktop only. */
+.cards-row-swiper {
+  overflow: visible;
 }
 
 .cards-row-swiper .swiper-button-prev,
 .cards-row-swiper .swiper-button-next {
-  color: #9146ff;
+  top: 0;
+  bottom: 0;
+  margin: 0;
+  width: 3rem;
+  height: auto;
+  background-color: rgb(20 20 20 / 0.7);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 150ms ease, background-color 150ms ease;
 }
 
-.cards-row-swiper .swiper-button-prev::after,
-.cards-row-swiper .swiper-button-next::after {
-  font-size: 1.4rem;
-  font-weight: 700;
+.cards-row-swiper:hover .swiper-button-prev,
+.cards-row-swiper:hover .swiper-button-next {
+  opacity: 1;
 }
 
-/* Hide scrollbar when player is active */
-html.player-active,
-html.player-active body {
-  overflow: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+.cards-row-swiper .swiper-button-prev:hover,
+.cards-row-swiper .swiper-button-next:hover {
+  background-color: rgb(20 20 20 / 0.9);
 }
 
-html.player-active::-webkit-scrollbar,
-html.player-active body::-webkit-scrollbar {
-  display: none;
+.cards-row-swiper .swiper-button-prev { left: -1rem; border-radius: 0 4px 4px 0; }
+.cards-row-swiper .swiper-button-next { right: -1rem; border-radius: 4px 0 0 4px; }
+
+/* Swiper 12 draws the arrow as an SVG; without a fixed size it fills the button. */
+.cards-row-swiper .swiper-button-prev svg,
+.cards-row-swiper .swiper-button-next svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .cards-row-swiper .swiper-button-prev.swiper-button-disabled,
@@ -75,10 +190,23 @@ html.player-active body::-webkit-scrollbar {
   }
 }
 
-/* Global scrollbar styling with Twitch color, hidden when idle */
+/* Hide scrollbar when player is active */
+html.player-active,
+html.player-active body {
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.player-active::-webkit-scrollbar,
+html.player-active body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Global scrollbar styling, hidden when idle */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 body::-webkit-scrollbar-track {
@@ -91,18 +219,18 @@ body::-webkit-scrollbar-thumb {
 }
 
 body:hover::-webkit-scrollbar-track {
-  background: #050508;
+  background: var(--md-surface-container-low);
 }
 
 body:hover::-webkit-scrollbar-thumb {
-  background-color: #9146ff;
+  background-color: var(--md-outline);
 }
 
 body:hover::-webkit-scrollbar-thumb:hover {
-  background-color: #772ce8;
+  background-color: var(--md-primary);
 }
 
-/* Shimmer animation for loading skeletons and card hover effects */
+/* Loading skeleton shimmer */
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
@@ -114,4 +242,65 @@ body:hover::-webkit-scrollbar-thumb:hover {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--md-surface-container-high);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--md-surface-container-highest), transparent);
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes top-progress {
+  0% {
+    transform: scaleX(0);
+  }
+  50% {
+    transform: scaleX(0.5);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.animate-top-progress {
+  animation: top-progress 1.5s ease-in-out infinite;
+}
+
+/* Bouncy press, shared by every control that uses .press. */
+.press {
+  transition:
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-radius 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.press:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press,
+  .banner-swiper .swiper-pagination-bullet {
+    transition: none;
+  }
+
+  .press:active:not(:disabled) {
+    transform: none;
+  }
+
+  .animate-shimmer,
+  .skeleton::after {
+    animation: none;
+  }
 }

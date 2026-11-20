@@ -5,6 +5,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import { usePrivateNavigate } from '../hooks/usePrivateNavigate';
 import { fetchDiscoverMedia, fetchTrendingTodayMedia } from '../Api-services/tmbd';
+import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded';
 
 const year = new Date().getFullYear();
 export const ROWS = [
@@ -337,6 +338,87 @@ export const ROWS = [
       without_origin_country: 'US',
     },
   },
+  // Anime: Animation genre (16) + Japanese original language.
+  {
+    id: 'anime-trending',
+    title: 'Trending Anime',
+    mediaType: 'tv',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'popularity.desc',
+      with_genres: '16',
+      with_original_language: 'ja',
+      'vote_count.gte': 100,
+    },
+  },
+  {
+    id: 'anime-top-rated',
+    title: 'Top Rated Anime',
+    mediaType: 'tv',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'vote_average.desc',
+      with_genres: '16',
+      with_original_language: 'ja',
+      'vote_average.gte': 8,
+      'vote_count.gte': 500,
+    },
+  },
+  {
+    id: 'anime-new',
+    title: 'New Anime',
+    mediaType: 'tv',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'popularity.desc',
+      with_genres: '16',
+      with_original_language: 'ja',
+      'first_air_date.gte': `${year - 1}-01-01`,
+      'vote_count.gte': 20,
+    },
+  },
+  {
+    id: 'anime-action-adventure',
+    title: 'Action & Adventure Anime',
+    mediaType: 'tv',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'popularity.desc',
+      with_genres: '16,10759',
+      with_original_language: 'ja',
+      'vote_count.gte': 100,
+    },
+  },
+  {
+    id: 'anime-fantasy',
+    title: 'Fantasy & Sci-Fi Anime',
+    mediaType: 'tv',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'popularity.desc',
+      with_genres: '16,10765',
+      with_original_language: 'ja',
+      'vote_count.gte': 100,
+    },
+  },
+  {
+    id: 'anime-movies',
+    title: 'Anime Movies',
+    mediaType: 'movie',
+    source: 'tmdb',
+    isAnimeRow: true,
+    params: {
+      sort_by: 'popularity.desc',
+      with_genres: '16',
+      with_original_language: 'ja',
+      'vote_count.gte': 200,
+    },
+  },
 ];
 
 function getImageUrls(item) {
@@ -363,6 +445,7 @@ function Cards({ rows = ROWS }) {
 
       const promises = rows.map(async (row) => {
         let items;
+        try {
 
         if (Array.isArray(row.mediaTypes) && row.source === 'tmdb') {
           const combined = await Promise.all(
@@ -442,6 +525,10 @@ function Cards({ rows = ROWS }) {
           });
         }
 
+        } catch {
+          items = [];
+        }
+
         return { id: row.id, items };
       });
 
@@ -485,163 +572,151 @@ function Cards({ rows = ROWS }) {
     navigate(`/stream/${type}/${item.id}`);
   };
 
+  // A title shows up once per page: rows are filled in order, and anything an
+  // earlier row already used is skipped. Movie and TV ids can collide, so the
+  // key includes the media type.
+  const seenTitles = new Set();
+  const MIN_ROW_ITEMS = 4;
+  const visibleRows = rows
+    .map((row) => {
+      const rawItems = rowsData[row.id] || row.items || [];
+      const isTrendingToday = row.source === 'trending-today';
+
+      const items = rawItems.filter((item) => {
+        // Anime stays out of the regular rows; the anime rows are the place for it.
+        const isAnime =
+          (item.genre_ids?.includes(16) || item.genres?.some((g) => g.id === 16)) &&
+          item.original_language === 'ja';
+        if ((isAnime && !row.isAnimeRow) || !item.id) return false;
+
+        const type =
+          item.media_type ||
+          (item.first_air_date && !item.release_date ? 'tv' : row.mediaType || 'movie');
+        const key = `${type}-${item.id}`;
+        if (seenTitles.has(key)) return false;
+        seenTitles.add(key);
+        return true;
+      });
+
+      return { row, isTrendingToday, items: isTrendingToday ? items.slice(0, 10) : items };
+    })
+    .filter(({ items }) => items.length >= MIN_ROW_ITEMS);
+
   return (
-    <div className="bg-black text-white px-4 md:px-8 pt-4 pb-16 space-y-8">
+    <div className="relative z-10 -mt-20 space-y-8 px-4 pb-4 md:px-12 md:pb-8">
       {loading && (
-        <>
+        <div aria-busy="true" aria-label="Loading titles" className="space-y-8">
           {Array.from({ length: 3 }).map((_, rowIndex) => (
-            <section key={`skeleton-row-${rowIndex}`} className="space-y-4">
-              {/* Enhanced title skeleton with gradient shimmer */}
-              <div className="h-6 w-48 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 rounded-lg overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-600/30 to-transparent animate-shimmer" />
-              </div>
-              <div className="flex gap-3">
-                {Array.from({ length: 6 }).map((__, cardIndex) => (
+            <section key={`skeleton-row-${rowIndex}`} className="space-y-3">
+              <div className="skeleton h-6 w-52 rounded-sm" />
+              <div className="flex gap-2 overflow-hidden">
+                {Array.from({ length: 7 }).map((__, cardIndex) => (
                   <div
                     key={`skeleton-card-${rowIndex}-${cardIndex}`}
-                    className="flex-shrink-0 w-32 md:w-56 aspect-[3/4] md:aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg overflow-hidden relative shadow-lg"
-                  >
-                    {/* Shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-600/20 to-transparent animate-shimmer" />
-                  </div>
+                    className="skeleton aspect-[2/3] w-32 shrink-0 rounded-sm md:aspect-video md:w-56"
+                  />
                 ))}
               </div>
             </section>
           ))}
-        </>
+        </div>
       )}
-      {rows.map((row) => {
-        const rawItems = rowsData[row.id] || row.items || [];
-        // Filter out Anime: Animation genre (16) + Japanese language ('ja')
-        const items = rawItems.filter(item => {
-          const isAnime = (item.genre_ids?.includes(16) || item.genres?.some(g => g.id === 16)) && item.original_language === 'ja';
-          return !isAnime;
-        });
 
-        const isTrendingToday = row.source === 'trending-today';
-        const rowItems = isTrendingToday ? items.slice(0, 10) : items;
+      {!loading && visibleRows.length === 0 && (
+        <p className="py-16 text-center text-on-surface-variant">
+          Nothing to show right now. Check your connection and try again.
+        </p>
+      )}
 
-        if (!rowItems || rowItems.length === 0) {
-          return null;
-        }
+      {visibleRows.map(({ row, isTrendingToday, items }) => (
+        <section key={row.id} aria-labelledby={`row-${row.id}`} className="space-y-2">
+          <h2 id={`row-${row.id}`} className="text-lg font-bold text-on-surface md:text-xl">
+            {row.title}
+          </h2>
+          <Swiper
+            modules={[Navigation]}
+            navigation
+            spaceBetween={8}
+            className="cards-row-swiper"
+            breakpoints={{
+              0: { slidesPerView: isTrendingToday ? 2.2 : 2.3, slidesPerGroup: 2 },
+              640: { slidesPerView: isTrendingToday ? 3 : 3.2, slidesPerGroup: 3 },
+              1024: {
+                slidesPerView: isTrendingToday ? 5 : 'auto',
+                slidesPerGroup: isTrendingToday ? 5 : 6,
+              },
+            }}
+          >
+            {items.map((item, index) => {
+              const { poster, backdrop } = getImageUrls(item);
+              const title = item.title || item.name || item.original_title || 'Untitled';
+              const rank = isTrendingToday ? index + 1 : null;
 
-        return (
-          <section key={row.id} className="space-y-4">
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent drop-shadow-lg">
-              {row.title}
-            </h2>
-            <Swiper
-              modules={[Navigation]}
-              navigation
-              spaceBetween={12}
-              className="cards-row-swiper"
-              breakpoints={{
-                0: {
-                  slidesPerView: isTrendingToday ? 2.2 : 2.3,
-                  slidesPerGroup: 2,
-                },
-                640: {
-                  slidesPerView: isTrendingToday ? 3 : 3.2,
-                  slidesPerGroup: 3,
-                },
-                1024: {
-                  slidesPerView: isTrendingToday ? 5 : 'auto',
-                  slidesPerGroup: isTrendingToday ? 5 : 6,
-                },
-              }}
-            >
-              {rowItems.map((item, index) => {
-                const { poster, backdrop } = getImageUrls(item);
-                const title =
-                  item.title || item.name || item.original_title || 'Untitled';
-                const rank = isTrendingToday ? index + 1 : null;
-
-                return (
-                  <SwiperSlide
-                    key={item.id || item.value || item.title}
-                    className={`!w-32 md:!w-56 ${
-                      isTrendingToday ? 'md:!w-60 lg:!w-64' : ''
-                    }`}
+              return (
+                <SwiperSlide
+                  key={item.id || item.value || item.title}
+                  className={`!w-32 md:!w-56 ${isTrendingToday ? 'md:!w-60 lg:!w-64' : ''}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleCardClick(row, item)}
+                    aria-label={rank ? `${rank}. ${title}` : title}
+                    className="group relative block aspect-[2/3] w-full overflow-hidden rounded-sm bg-surface-container text-left transition-transform duration-300 hover:z-20 hover:scale-110 focus-visible:z-20 focus-visible:scale-110 md:aspect-video"
                   >
-                    <div className="flex flex-col">
-                      <div
-                        className="group relative w-full aspect-[3/4] md:aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 ease-out hover:scale-[1.08] hover:shadow-2xl hover:shadow-purple-500/20 hover:z-10"
-                        onClick={() => handleCardClick(row, item)}
-                        style={{
-                          transformOrigin: 'center',
-                        }}
-                      >
-                        {/* Animated gradient border on hover */}
-                        <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-purple-500/50 via-pink-500/50 to-purple-500/50 blur-sm -z-10" />
-                        
-                        {poster || backdrop ? (
-                          <>
-                            <img
-                              src={poster || backdrop}
-                              alt={title}
-                              className="h-full w-full object-cover md:hidden transition-all duration-300 group-hover:brightness-75"
-                            />
-                            <img
-                              src={backdrop || poster}
-                              alt={title}
-                              className="hidden md:block h-full w-full object-cover transition-all duration-300 group-hover:brightness-75"
-                            />
-                          </>
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-xs text-zinc-300 px-2 text-center">
-                            {title}
-                          </div>
-                        )}
-                        
-                        {/* Enhanced gradient overlay with glassmorphism */}
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-8 hidden md:block backdrop-blur-[2px]">
-                          <p className="text-sm md:text-base font-semibold truncate text-white drop-shadow-lg">
-                            {title}
-                          </p>
-                        </div>
-                        
-                        {/* Enhanced rank badge with glow effect */}
-                        {rank && (
-                          <div className="pointer-events-none absolute -left-2 -bottom-1 hidden md:block">
-                            <span 
-                              className="text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400"
-                              style={{
-                                WebkitTextStroke: '3px white',
-                                filter: 'drop-shadow(0 0 12px rgba(0,0,0,0.95)) drop-shadow(0 0 20px rgba(145,70,255,0.4))',
-                              }}
-                            >
-                              {rank}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Enhanced play button with Twitch color and glow */}
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-                          <div className="h-12 w-12 md:h-14 md:w-14 rounded-full bg-[#9146FF] flex items-center justify-center shadow-2xl group-hover:scale-110 transition-all duration-300 relative">
-                            {/* Glow effect */}
-                            <div className="absolute inset-0 rounded-full bg-[#9146FF] opacity-75 blur-xl animate-pulse" />
-                            <span className="ml-1 text-white text-xl md:text-2xl relative z-10 drop-shadow-lg font-bold">
-                              ▶
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {/* Shimmer effect on hover */}
-                        <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                        </div>
-                      </div>
-                      <p className="mt-2 text-xs sm:text-sm font-semibold truncate md:hidden text-zinc-200">
+                    {poster || backdrop ? (
+                      <>
+                        <img
+                          src={poster || backdrop}
+                          alt=""
+                          width="500"
+                          height="750"
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover md:hidden"
+                        />
+                        <img
+                          src={backdrop || poster}
+                          alt=""
+                          width="780"
+                          height="439"
+                          loading="lazy"
+                          decoding="async"
+                          className="hidden h-full w-full object-cover md:block"
+                        />
+                      </>
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-on-surface-variant">
                         {title}
-                      </p>
-                    </div>
-                  </SwiperSlide>
-                );
-              })}
-            </Swiper>
-          </section>
-        );
-      })}
+                      </span>
+                    )}
+
+                    {rank && (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute bottom-0 left-2 hidden text-7xl font-black leading-none text-black md:block"
+                        style={{ WebkitTextStroke: '2px #fff' }}
+                      >
+                        {rank}
+                      </span>
+                    )}
+
+                    {/* Title appears on hover or keyboard focus, like Netflix. */}
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black via-black/70 to-transparent px-3 pb-2 pt-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-on-surface text-surface">
+                        <PlayArrowRounded fontSize="small" />
+                      </span>
+                      <span className="truncate text-sm font-bold text-on-surface">{title}</span>
+                    </span>
+                  </button>
+                  <p className="mt-1.5 truncate text-xs font-medium text-on-surface-variant md:hidden">
+                    {title}
+                  </p>
+                </SwiperSlide>
+              );
+            })}
+          </Swiper>
+        </section>
+      ))}
     </div>
   );
 }
