@@ -155,7 +155,7 @@ function GlobalPlayer() {
   // --- Optimization: Preconnect ---
   useEffect(() => {
     // Aggressive preconnect
-    const domains = ['https://cinemaos.tech'];
+    const domains = ['https://vidlink.pro'];
     const nodes = [];
     domains.forEach(d => {
         const l1 = document.createElement('link');
@@ -545,7 +545,9 @@ function GlobalPlayer() {
                         src={session.playerSrc}
                         className="w-full h-full border-0"
                         allow="autoplay *; encrypted-media *; picture-in-picture *"
+                        allowFullScreen
                         onLoad={(event) => {
+                            // vidlink.pro is cross-origin, so we can't inject into it; skip silently.
                             try {
                                 installPopupBlocker(event.currentTarget.contentWindow);
                                 observePlayerInteraction(
@@ -553,9 +555,7 @@ function GlobalPlayer() {
                                     revealControls,
                                 );
                             } catch {
-                                // If an ad navigates the iframe off-origin, restore the player.
-                                event.currentTarget.src = session.playerSrc;
-                                return;
+                                // Cross-origin: nothing to install.
                             }
                         }}
                     />
